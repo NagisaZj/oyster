@@ -432,16 +432,30 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         paths = []
         num_transitions = 0
         num_trajs = 0
-        path,num = self.smm_sampler.obtain_samples(max_samples=self.max_path_length,max_trajs=1,accum_context=True)
-        num_transitions += num
-        self.agent.infer_posterior(self.agent.context)
-        while num_transitions < self.num_steps_per_eval:
-            path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.num_steps_per_eval - num_transitions, max_trajs=1, accum_context=True)
-            paths += path
+        if self.use_SMM:
+            path, num = self.smm_sampler.obtain_samples(max_samples=self.max_path_length, max_trajs=1,
+                                                        accum_context=True)
             num_transitions += num
-            num_trajs += 1
-            if num_trajs >= self.num_exp_traj_eval:
-                self.agent.infer_posterior(self.agent.context)
+            self.agent.infer_posterior(self.agent.context)
+            while num_transitions < self.num_steps_per_eval:
+                path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                        max_samples=self.num_steps_per_eval - num_transitions,
+                                                        max_trajs=1, accum_context=True)
+                paths += path
+                num_transitions += num
+                num_trajs += 1
+                if num_trajs >= self.num_exp_traj_eval:
+                    self.agent.infer_posterior(self.agent.context)
+        else:
+            while num_transitions < self.num_steps_per_eval:
+                path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                        max_samples=self.num_steps_per_eval - num_transitions,
+                                                        max_trajs=1, accum_context=True)
+                paths += path
+                num_transitions += num
+                num_trajs += 1
+                if num_trajs >= self.num_exp_traj_eval:
+                    self.agent.infer_posterior(self.agent.context)
 
         if self.sparse_rewards:
             for p in paths:
