@@ -10,6 +10,9 @@ from rlkit.data_management.env_replay_buffer import MultiTaskReplayBuffer
 from rlkit.data_management.path_builder import PathBuilder
 from rlkit.samplers.in_place import InPlacePathSampler
 from rlkit.torch import pytorch_util as ptu
+from rlkit.smm.smm_policy import hard_smm_point
+from rlkit.smm.smm_sampler import SMMSampler
+
 
 
 class MetaRLAlgorithm(metaclass=abc.ABCMeta):
@@ -46,6 +49,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             render_eval_paths=False,
             dump_eval_paths=False,
             plotter=None,
+            use_SMM=False
     ):
         """
         :param env: training env
@@ -89,11 +93,19 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         self.render_eval_paths = render_eval_paths
         self.dump_eval_paths = dump_eval_paths
         self.plotter = plotter
+        self.use_SMM = use_SMM
 
         self.sampler = InPlacePathSampler(
             env=env,
             policy=agent,
             max_path_length=self.max_path_length,
+        )
+
+        if self.use_SMM:
+            self.smm_sampler = SMMSampler(
+                env=env,
+                policy=hard_smm_point(),
+                max_path_length=max_path_length
         )
 
         # separate replay buffers for
@@ -200,7 +212,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         """
         pass
 
-    def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True):
+    def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True,add_to_policy_buffer=True):
         '''
         get trajectories from current env in batch mode with given policy
         collect complete trajectories until the number of collected transitions >= num_samples
@@ -221,7 +233,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                                                                 accum_context=False,
                                                                 resample=resample_z_rate)
             num_transitions += n_samples
-            self.replay_buffer.add_paths(self.task_idx, paths)
+            if add_to_policy_buffer:
+                self.replay_buffer.add_paths(self.task_idx, paths)
             if add_to_enc_buffer:
                 self.enc_replay_buffer.add_paths(self.task_idx, paths)
             if update_posterior_rate != np.inf:
