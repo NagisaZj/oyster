@@ -440,7 +440,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             while num_transitions < self.num_steps_per_eval:
                 path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
                                                         max_samples=self.num_steps_per_eval - num_transitions,
-                                                        max_trajs=1, accum_context=True)
+                                                        max_trajs=1, accum_context=False)
                 paths += path
                 num_transitions += num
                 num_trajs += 1

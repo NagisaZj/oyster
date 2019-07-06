@@ -12,6 +12,7 @@ def dprint(*args):
     # hacky, but will do for now
     if int(os.environ['DEBUG']) == 1:
         print(args)
+    #print(args)
 
 
 def get_generic_path_information(paths, stat_prefix=''):
