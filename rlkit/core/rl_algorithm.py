@@ -105,7 +105,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             self.smm_sampler = SMMSampler(
                 env=env,
                 policy=hard_smm_point(),
-                max_path_length=max_path_length
+                max_path_length=max_path_length,
+                agent = agent
         )
 
         # separate replay buffers for
@@ -173,7 +174,11 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                 for idx in self.train_tasks:
                     self.task_idx = idx
                     self.env.reset_task(idx)
-                    self.collect_data(self.num_initial_steps, 1, np.inf)
+                    if not self.use_SMM:
+                        self.collect_data(self.num_initial_steps, 1, np.inf)
+                    else:
+                        self.collect_data_smm(self.num_initial_steps)
+                        self.collect_data_policy(self.num_initial_steps, 1, np.inf)
             # Sample data from train tasks.
             for i in range(self.num_tasks_sample):
                 idx = np.random.randint(len(self.train_tasks))
@@ -181,15 +186,28 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                 self.env.reset_task(idx)
                 self.enc_replay_buffer.task_buffers[idx].clear()
 
-                # collect some trajectories with z ~ prior
-                if self.num_steps_prior > 0:
-                    self.collect_data(self.num_steps_prior, 1, np.inf)
-                # collect some trajectories with z ~ posterior
-                if self.num_steps_posterior > 0:
-                    self.collect_data(self.num_steps_posterior, 1, self.update_post_train)
-                # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
-                if self.num_extra_rl_steps_posterior > 0:
-                    self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train, add_to_enc_buffer=False)
+                if not self.use_SMM:
+                    # collect some trajectories with z ~ prior
+                    if self.num_steps_prior > 0:
+                        self.collect_data(self.num_steps_prior, 1, np.inf)
+                    # collect some trajectories with z ~ posterior
+                    if self.num_steps_posterior > 0:
+                        self.collect_data(self.num_steps_posterior, 1, self.update_post_train)
+                    # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
+                    if self.num_extra_rl_steps_posterior > 0:
+                        self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,
+                                          add_to_enc_buffer=False)
+                else:
+                    if self.num_steps_prior > 0:
+                        self.collect_data_smm(self.num_steps_prior)
+                        self.collect_data_policy(self.num_steps_prior, 1, np.inf)
+                    # collect some trajectories with z ~ posterior
+                    if self.num_steps_posterior > 0:
+                        self.collect_data_smm(self.num_steps_posterior)
+                        self.collect_data_policy(self.num_steps_posterior, 1, self.update_post_train)
+                    # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
+                    if self.num_extra_rl_steps_posterior > 0:
+                        self.collect_data_policy(self.num_extra_rl_steps_posterior, 1, self.update_post_train)
 
             # Sample train tasks and compute gradient updates on parameters.
             for train_step in range(self.num_train_steps_per_itr):
@@ -211,6 +229,51 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         Do anything before the main training phase.
         """
         pass
+
+
+    def collect_data_smm(self,num_samples):
+        '''
+        Notice that SMM data should only be available for the encoder
+        :param num_samples: number of transitions to sample
+        :return:
+        '''
+        num_transitions = 0
+        while num_transitions < num_samples:
+            paths, n_samples = self.smm_sampler.obtain_samples(max_samples=num_samples - num_transitions,
+                                                           max_trajs=np.inf)
+            num_transitions += n_samples
+
+            self.enc_replay_buffer.add_paths(self.task_idx, paths)
+        self._n_env_steps_total += num_transitions
+        gt.stamp('smm sample')
+
+    def collect_data_policy(self, num_samples, resample_z_rate, update_posterior_rate):
+        '''
+        get trajectories from current env in batch mode with given policy
+        collect complete trajectories until the number of collected transitions >= num_samples
+
+        :param agent: policy to rollout
+        :param num_samples: total number of transitions to sample
+        :param resample_z_rate: how often to resample latent context z (in units of trajectories)
+        :param update_posterior_rate: how often to update q(z | c) from which z is sampled (in units of trajectories)
+        :param add_to_enc_buffer: whether to add collected data to encoder replay buffer
+        '''
+        # start from the prior
+        self.agent.clear_z()
+
+        num_transitions = 0
+        while num_transitions < num_samples:
+            paths, n_samples = self.sampler.obtain_samples(max_samples=num_samples - num_transitions,
+                                                                max_trajs=update_posterior_rate,
+                                                                accum_context=False,
+                                                                resample=resample_z_rate)
+            num_transitions += n_samples
+            self.replay_buffer.add_paths(self.task_idx, paths)
+            if update_posterior_rate != np.inf:
+                context = self.prepare_context(self.task_idx)
+                self.agent.infer_posterior(context)
+        self._n_env_steps_total += num_transitions
+        gt.stamp('policy sample')
 
     def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True,add_to_policy_buffer=True):
         '''
@@ -272,7 +335,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
 
             times_itrs = gt.get_times().stamps.itrs
             train_time = times_itrs['train'][-1]
-            sample_time = times_itrs['sample'][-1]
+            if not self.use_SMM:
+                sample_time = times_itrs['sample'][-1]
+            else:
+                sample_time = times_itrs['policy sample'][-1]
             eval_time = times_itrs['eval'][-1] if epoch > 0 else 0
             epoch_time = train_time + sample_time + eval_time
             total_time = gt.get_times().total
@@ -366,6 +432,9 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         paths = []
         num_transitions = 0
         num_trajs = 0
+        path,num = self.smm_sampler.obtain_samples(max_samples=self.max_path_length,max_trajs=1,accum_context=True)
+        num_transitions += num
+        self.agent.infer_posterior(self.agent.context)
         while num_transitions < self.num_steps_per_eval:
             path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.num_steps_per_eval - num_transitions, max_trajs=1, accum_context=True)
             paths += path
@@ -416,9 +485,15 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             # 100 arbitrarily chosen for visualizations of point_robot trajectories
             # just want stochasticity of z, not the policy
             self.agent.clear_z()
-            prior_paths, _ = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.max_path_length * 20,
+            if not self.use_SMM:
+                prior_paths, _ = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                             max_samples=self.max_path_length * 20,
                                                         accum_context=False,
                                                         resample=1)
+            else:
+                prior_paths, _ = self.smm_sampler.obtain_samples(
+                                                             max_samples=self.max_path_length * 20,
+                                                             )
             logger.save_extra_data(prior_paths, path='eval_trajectories/prior-epoch{}'.format(epoch))
 
         ### train tasks

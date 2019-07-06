@@ -14,9 +14,10 @@ class SMMSampler(object):
     sampler.obtain_samples  # this has side-effects: env will change!
     ```
     """
-    def __init__(self, env, policy, max_path_length):
+    def __init__(self, env, policy, max_path_length,agent):
         self.env = env
         self.policy = policy
+        self.agent = agent
 
         self.max_path_length = max_path_length
 
@@ -39,7 +40,7 @@ class SMMSampler(object):
         n_trajs = 0
         while n_steps_total < max_samples and n_trajs < max_trajs:
             path = self.rollout(
-                self.env, self.policy, max_path_length=self.max_path_length, accum_context=False)
+                self.env, self.policy, max_path_length=self.max_path_length, accum_context=accum_context,agent_target=self.agent)
             # save the latent context that generated this trajectory
             path['context'] = None
             paths.append(path)
@@ -50,7 +51,7 @@ class SMMSampler(object):
             #    policy.sample_z()
         return paths, n_steps_total
 
-    def rollout(self,env, agent, max_path_length=np.inf, accum_context=False, resample_z=False, animated=False):
+    def rollout(self,env, agent, max_path_length=np.inf, accum_context=False, resample_z=False, animated=False,agent_target=None):
         """
         The following value for the following keys will be a 2D array, with the
         first dimension corresponding to the time dimension.
@@ -70,6 +71,7 @@ class SMMSampler(object):
         :param max_path_length:
         :param animated:
         :param accum_context: if True, accumulate the collected context
+        :param agent_target: update context while evaluation and testing
         :return:
         """
         observations = []
@@ -87,8 +89,8 @@ class SMMSampler(object):
             a, agent_info = agent.get_action(o)
             next_o, r, d, env_info = env.step(a)
             # update the agent's current context
-            #if accum_context:
-            #    agent.update_context([o, a, r, next_o, d, env_info])
+            if accum_context:
+                agent_target.update_context([o, a, r, next_o, d, env_info])
             observations.append(o)
             rewards.append(r)
             terminals.append(d)
@@ -96,8 +98,8 @@ class SMMSampler(object):
             agent_infos.append(agent_info)
             env_infos.append(env_info)
             path_length += 1
-            if d:
-                break
+            #if d:
+            #    break
             o = next_o
             #if animated:
             #    env.render()

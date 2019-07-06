@@ -9,12 +9,13 @@ import colour
 
 
 # config
-exp_id = '2019_07_06_14_34_48' # EDIT THIS
+exp_id = '2019_07_06_16_14_05' # EDIT THIS
+#exp_id = '2019_07_06_14_34_48'
 tlow, thigh = 81, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 2 # training epoch to load data from
+epoch = 0 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
 expdir = './output/sparse-point-robot/{}/eval_trajectories/'.format(exp_id) # directory to load data from

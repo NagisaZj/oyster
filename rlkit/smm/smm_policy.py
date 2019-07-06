@@ -8,13 +8,13 @@ class hard_smm_point():
 
     def get_action(self,observation):
         if np.sqrt(observation[0]**2+observation[1]**2)<=0.95:
-            action = np.array([-0.1,0],dtype=np.float32)
+            action = np.array([-1,0],dtype=np.float32)
         elif observation[1]<0:
             action = -1 * observation
-            action = np.clip(action,-0.1,0.1)
+            action = np.clip(action,-1,1)
         else:
             theta = np.arccos(observation[0]/np.sqrt(observation[0]**2+observation[1]**2))
-            action = np.array([np.cos(theta-np.pi/2),np.sin(theta-np.pi/2)],dtype=np.float32)*0.1
+            action = np.array([np.cos(theta-np.pi/2),np.sin(theta-np.pi/2)],dtype=np.float32)*1
 
         return action,None
 
