@@ -125,3 +125,40 @@ class NormalizedBoxEnv(ProxyEnv, Serializable):
 
     def __getattr__(self, attrname):
         return getattr(self._wrapped_env, attrname)
+
+
+class AugmentedBoxObservationShapeEnv(ProxyEnv, Serializable):
+    """
+    Adds one-hot to observation shape.
+    """
+    def __init__(
+            self,
+            env,
+            aug_obs_size
+    ):
+        # self._wrapped_env needs to be called first because
+        # Serializable.quick_init calls getattr, on this class. And the
+        # implementation of getattr (see below) calls self._wrapped_env.
+        # Without setting this first, the call to self._wrapped_env would call
+        # getattr again (since it's not set yet) and therefore loop forever.
+        self._wrapped_env = env
+        # Or else serialization gets delegated to the wrapped_env. Serialize
+        # this env separately from the wrapped_env.
+        self._serializable_initialized = False
+        Serializable.quick_init(self, locals())
+        ProxyEnv.__init__(self, env)
+
+        obs_space = self._wrapped_env.observation_space
+        assert isinstance(obs_space, Box)
+        low = np.hstack([obs_space.low, np.full(aug_obs_size, 0)])
+        high = np.hstack([obs_space.high, np.full(aug_obs_size, 1)])
+        self.observation_space = Box(low=low, high=high)
+
+    def get_diagnostics(self, paths, **kwargs):
+        if hasattr(self._wrapped_env, "get_diagnostics"):
+            return self._wrapped_env.get_diagnostics(paths, **kwargs)
+        else:
+            return None
+
+    def __getattr__(self, attrname):
+        return getattr(self._wrapped_env, attrname)
