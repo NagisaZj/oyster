@@ -72,7 +72,7 @@ _use_gpu = False
 device = None
 
 
-def set_gpu_mode(mode, gpu_id=0):
+def set_gpu_mode(mode, gpu_id=7):
     global _use_gpu
     global device
     global _gpu_id

@@ -49,7 +49,11 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             render_eval_paths=False,
             dump_eval_paths=False,
             plotter=None,
-            use_SMM=False
+            use_SMM=False,
+            load_SMM =False,
+            use_history=False,
+            SMM_path=None,
+            num_skills = 1
     ):
         """
         :param env: training env
@@ -94,6 +98,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         self.dump_eval_paths = dump_eval_paths
         self.plotter = plotter
         self.use_SMM = use_SMM
+        self.load_SMM = load_SMM
+        self.use_history = use_history,
+        self.SMM_path = SMM_path
+        self.num_skills = num_skills
 
         self.sampler = InPlacePathSampler(
             env=env,
@@ -104,9 +112,12 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         if self.use_SMM:
             self.smm_sampler = SMMSampler(
                 env=env,
-                policy=hard_smm_point(),
                 max_path_length=max_path_length,
-                agent = agent
+                agent = agent,
+                load_SMM=self.load_SMM,
+                use_history=self.use_history,
+                SMM_path=self.SMM_path,
+                num_skills = self.num_skills
         )
 
         # separate replay buffers for
@@ -433,18 +444,34 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         num_transitions = 0
         num_trajs = 0
         if self.use_SMM:
-            path, num = self.smm_sampler.obtain_samples(max_samples=self.max_path_length, max_trajs=1,
-                                                        accum_context=True)
-            num_transitions += num
-            self.agent.infer_posterior(self.agent.context)
-            while num_transitions < self.num_steps_per_eval:
-                path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
-                                                        max_samples=self.num_steps_per_eval - num_transitions,
-                                                        max_trajs=1, accum_context=False)
-                paths += path
+            if not self.load_SMM:
+                path, num = self.smm_sampler.obtain_samples(max_samples=self.max_path_length, max_trajs=1,
+                                                            accum_context=True)
                 num_transitions += num
-                num_trajs += 1
-                if num_trajs >= self.num_exp_traj_eval:
+                self.agent.infer_posterior(self.agent.context)
+                while num_transitions < self.num_steps_per_eval:
+                    path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                            max_samples=self.num_steps_per_eval - num_transitions,
+                                                            max_trajs=1, accum_context=False)
+                    paths += path
+                    num_transitions += num
+                    num_trajs += 1
+                    if num_trajs >= self.num_exp_traj_eval:
+                        self.agent.infer_posterior(self.agent.context)
+            else:
+                while num_transitions < self.num_steps_per_eval:
+                    path, num = self.smm_sampler.obtain_samples(max_samples=self.max_path_length, max_trajs=1,
+                                                                accum_context=True)
+                    num_transitions += num
+                    #paths+=path
+                    num_trajs += 1
+                    path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                            max_samples=self.num_steps_per_eval - num_transitions,
+                                                            max_trajs=1, accum_context=False)
+                    paths += path
+                    num_transitions += num
+                    num_trajs += 1
+
                     self.agent.infer_posterior(self.agent.context)
         else:
             while num_transitions < self.num_steps_per_eval:
@@ -480,7 +507,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             for r in range(self.num_evals):
                 paths = self.collect_paths(idx, epoch, r)
                 all_rets.append([eval_util.get_average_returns([p]) for p in paths])
-            final_returns.append(np.mean([a[-1] for a in all_rets]))
+            final_returns.append(np.mean([np.mean(a) for a in all_rets]))
             # record online returns for the first n trajectories
             n = min([len(a) for a in all_rets])
             all_rets = [a[:n] for a in all_rets]

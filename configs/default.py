@@ -40,10 +40,14 @@ default_config = dict(
         num_exp_traj_eval=1, # how many exploration trajs to collect before beginning posterior sampling at test time
         recurrent=False, # recurrent or permutation-invariant encoder
         dump_eval_paths=False, # whether to save evaluation trajectories
-        use_SMM=False  #whether use SMM for encoder sampling
+        use_SMM=False,  #whether use SMM for encoder sampling
+        load_SMM=False,  #whether use trained SMM if use_SMM is True
+        use_history=False,  # whether use history average over SMM policies
+        SMM_path = '/home/zj/Desktop/sample/smm/out/PointEnv-1-0.1/sac-smm-1-rl1.0-sec10.0-lec1.0-lcec1.0_2019_07_08_20_20_29_0000--s-0', # path to load SMM,
+        num_skills = 1 # number of skills used by SMM, unused for now
     ),
     util_params=dict(
-        base_log_dir='output',
+        base_log_dir='output1',
         use_gpu=True,
         gpu_id=0,
         debug=False, # debugging triggers printing and writes logs to debug directory

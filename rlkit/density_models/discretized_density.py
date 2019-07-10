@@ -8,7 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import torch
 
-import rlkit.smm.statemarginalmatch.rlkit.torch.smm.utils as utils
+import rlkit.smm.utils as utils
 
 
 class DiscretizedDensity(object):

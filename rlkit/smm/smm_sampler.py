@@ -1,5 +1,5 @@
 import numpy as np
-
+from rlkit.smm.smm_policy import hard_smm_point,trained_smm_point
 
 
 
@@ -14,9 +14,12 @@ class SMMSampler(object):
     sampler.obtain_samples  # this has side-effects: env will change!
     ```
     """
-    def __init__(self, env, policy, max_path_length,agent):
+    def __init__(self, env, max_path_length,agent,load_SMM,use_history,SMM_path,num_skills):
         self.env = env
-        self.policy = policy
+        if load_SMM:
+            self.policy = trained_smm_point(use_history,SMM_path,num_skills)
+        else:
+            self.policy = hard_smm_point()
         self.agent = agent
 
         self.max_path_length = max_path_length

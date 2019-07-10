@@ -6,6 +6,9 @@ import os
 import joblib
 from rlkit.envs.wrappers import NormalizedBoxEnv, AugmentedBoxObservationShapeEnv
 from rlkit.envs.sparse_point_env import PointEnv_SMM
+from rlkit.smm.smm_hook import SMMHook
+from rlkit.smm.historical_policies_hook import HistoricalPoliciesHook
+import pickle
 
 def create_env(env_id, env_kwargs, num_skills=0):
     if env_id == 'PointEnv':
@@ -55,6 +58,9 @@ def load_experiment(log_dir, variant_overwrite=dict()):
         pkl_file = 'params.pkl'
     ckpt_path = os.path.join(log_dir, pkl_file)
     print('Loading checkpoint:', ckpt_path)
+    f = open(ckpt_path, 'rb')
+    info = pickle.load(f)
+    print(info)
     data = joblib.load(ckpt_path)
     print('Data:')
     print(data)
@@ -86,7 +92,10 @@ class hard_smm_point():
 
 
 class trained_smm_point():
-    def __init__(self,log_dir):
+    def __init__(self,use_history,SMM_path,num_skills):
+        self.use_history = use_history
+        log_dir=SMM_path
+        self.num_skills = num_skills
         from rlkit.torch.sac.sac import SoftActorCritic
         self.config = dict(
   env_kwargs=dict(
@@ -116,23 +125,50 @@ class trained_smm_point():
 )
         with open('/home/zj/Desktop/sample/smm/configs/test_no_ha_point.json') as f:
             exp_params = json.load(f)
-            overwrite_dict(self.config, exp_params)
+        overwrite_dict(self.config, exp_params)
 
         ptu.set_gpu_mode(True)
         env, _, data, variant = load_experiment(log_dir, self.config)
 
-        policy = data['policy']
+        variant['historical_policies_kwargs']['num_historical_policies'] = 10 if self.use_history else 0
+        self.policy = data['policy']
+
         vf = data['vf']
         qf = data['qf']
-        algorithm = SoftActorCritic(
+        self.algorithm = SoftActorCritic(
             env=env,
             training_env=env,  # can't clone box2d env cause of swig
             save_environment=False,  # can't save box2d env cause of swig
-            policy=policy,
+            policy=self.policy,
             qf=qf,
             vf=vf,
             **variant['algo_kwargs'],
         )
+        self.policy.to('cuda')
+        if variant['intrinsic_reward'] == 'smm':
+            discriminator = data['discriminator']
+            density_model = data['density_model']
+            SMMHook(
+                base_algorithm=self.algorithm,
+                discriminator=discriminator,
+                density_model=density_model,
+                **variant['smm_kwargs'])
+
+        # Overwrite algorithm for historical averaging.
+        if variant['historical_policies_kwargs']['num_historical_policies'] > 0:
+            HistoricalPoliciesHook(
+                base_algorithm=self.algorithm,
+                log_dir=log_dir,
+                **variant['historical_policies_kwargs'],
+            )
+
+    def get_action(self,observation):
+        ptu.set_gpu_mode(True)
+        #for param in self.policy.parameters():
+        #    print(param)
+        aug_observation = np.hstack([observation,1])
+        action = self.algorithm.policy.get_actions(aug_observation)
+        return action,None
 
 
 
@@ -150,8 +186,8 @@ if __name__=="__main__":
 
     plt.show()'''
 
-    policy = trained_smm_point('/home/zj/Desktop/sample/smm/out/PointEnv-1-0.1/sac-smm-1-rl1.0-sec10.0-lec1.0-lcec1.0_2019_07_08_20_20_29_0000--s-0')
-
+    policy = trained_smm_point(True,'/home/zj/Desktop/sample/smm/out/PointEnv-1-0.1/sac-smm-1-rl1.0-sec10.0-lec1.0-lcec1.0_2019_07_08_20_20_29_0000--s-0',1)
+    print(policy.get_action(np.array([0,0])))
 
 
 
