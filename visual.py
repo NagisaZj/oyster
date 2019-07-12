@@ -35,15 +35,21 @@ exp_id = '2019_07_09_19_42_14'
 #tracking the rewards
 #exp_id = '2019_07_10_14_05_27'
 
+#tracking z
+#exp_id = '2019_07_12_09_06_15' #original
+#exp_id = '2019_07_12_09_06_38' #smm
+
 tlow, thigh = 80, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 200 # training epoch to load data from
+epoch = 100 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
 expdir = './output/sparse-point-robot/{}/eval_trajectories/'.format(exp_id) # directory to load data from
 expdir = './SMMout/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+#expdir = './output1/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+#expdir = './output_z/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
 # helpers
 def load_pkl(task):
     with open(os.path.join(expdir, 'task{}-epoch{}-run0.pkl'.format(task, epoch)), 'rb') as f:
@@ -95,16 +101,25 @@ all_paths_rew = []
 for task in range(tlow, thigh):
     paths = [t['rewards'] for t in load_pkl(task)]
     all_paths_rew.append(paths)
+
+'''all_paths_z_means = []
+all_paths_z_vars = []
+for task in range(tlow, thigh):
+    means = [t['z_means'] for t in load_pkl(task)]
+    vars = [t['z_vars'] for t in load_pkl(task)]
+    all_paths_z_means.append(means)
+    all_paths_z_vars.append(means)'''
+
 reward = np.zeros((20,1))
 final_rew = np.zeros((20,1))
 for m in range(20):
     for n in range(len(all_paths_rew[m])):
-        #reward[m] = reward[m] + sum(all_paths_rew[m][n])
-        reward[m] = reward[m] + all_paths_rew[m][n][-1]
+        reward[m] = reward[m] + np.sum(all_paths_rew[m][n])
+        #reward[m] = reward[m] + all_paths_rew[m][n][-1]
     reward[m] = reward[m] / len(all_paths_rew[m])
 
-print(reward)
-print(np.mean(reward))
+#print(reward)
+#print(np.mean(reward))
 
 for j in range(3):
     for i in range(3):
@@ -124,5 +139,6 @@ for j in range(3):
             counter += 1
         axes[i,j].set_title("average reward:%f"%reward[t])
         t += 1
+
 fig.suptitle("iteration:%d, average reward of all tasks:%f"%(epoch,np.mean(reward)))
 plt.show()
