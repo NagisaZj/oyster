@@ -39,16 +39,20 @@ exp_id = '2019_07_09_19_42_14'
 #exp_id = '2019_07_12_09_06_15' #original
 #exp_id = '2019_07_12_09_06_38' #smm
 
+exp_id = '2019_07_27_14_04_36' #original
+#exp_id = '2019_07_27_14_04_25' #seed sampling
+#exp_id = '2019_07_27_14_39_13' #seed sampling
+
 tlow, thigh = 80, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 100 # training epoch to load data from
+epoch = 3 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
 expdir = './output/sparse-point-robot/{}/eval_trajectories/'.format(exp_id) # directory to load data from
 expdir = './SMMout/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
-#expdir = './output1/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+expdir = './output1/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
 #expdir = './output_z/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
 # helpers
 def load_pkl(task):

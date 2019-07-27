@@ -120,3 +120,60 @@ class SparsePointEnv(PointEnv):
             sparse_reward += 1
         d.update({'sparse_reward': sparse_reward})
         return ob, reward, done, d
+
+
+@register_env('goal-pitfall')
+class goal_pitfall_env(PointEnv):
+    '''
+     - tasks sampled from unit half-circle
+     - reward is L2 distance given only within goal radius
+
+     NOTE that `step()` returns the dense reward because this is used during meta-training
+     the algorithm should call `sparsify_rewards()` to get the sparse rewards
+     '''
+    def __init__(self, randomize_tasks=False, n_tasks=2, goal_radius=0.2):
+        #super().__init__(randomize_tasks, n_tasks)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,))
+        self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,))
+        self.goal_radius = goal_radius
+
+        if randomize_tasks:
+            np.random.seed(1337)
+            goals = np.random.rand(n_tasks,2)*-0.4 - 0.8
+            pitfalls = np.random.rand(n_tasks, 2) * 0.4 + 0.8
+            for i in range(n_tasks):
+                if np.random.rand()>0.5:
+                    goals[i,:] = -1 * goals[i,:]
+                    pitfalls[i,:] = -1 * pitfalls[i,:]
+            goals = goals.tolist()
+            pitfalls = pitfalls.tolist()
+
+
+        self.goals = goals
+        self.pitfalls = pitfalls
+        self.reset_task(0)
+
+    def reset_task(self, idx):
+        ''' reset goal AND reset the agent '''
+        self._goal = self.goals[idx]
+        self._pitfall = self.pitfalls[idx]
+        self.reset()
+
+
+
+    def reset_model(self):
+        self._state = np.array([0, 0])
+        return self._get_obs()
+
+    def step(self, action):
+        ob, reward, done, d = super().step(action)
+        x, y = self._state
+        x -= self._pitfall[0]
+        y -= self._pitfall[1]
+        pitfall_dis =  (x ** 2 + y ** 2) ** 0.5
+        pitfall_rew = pitfall_dis - 1
+        pitfall_rew = 0 if pitfall_rew>0 else pitfall_rew
+        if pitfall_dis<0.3:
+            pitfall_rew = pitfall_rew - 20
+        reward = reward + pitfall_rew
+        return ob, reward, done, d

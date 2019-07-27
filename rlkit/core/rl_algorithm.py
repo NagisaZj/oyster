@@ -8,7 +8,7 @@ import numpy as np
 from rlkit.core import logger, eval_util
 from rlkit.data_management.env_replay_buffer import MultiTaskReplayBuffer,EnvReplayBuffer
 from rlkit.data_management.path_builder import PathBuilder
-from rlkit.samplers.in_place import SMMInPlacePathSampler, InPlacePathSampler
+from rlkit.samplers.in_place import SMMInPlacePathSampler, InPlacePathSampler,SeedInPlacePathSampler
 from rlkit.torch import pytorch_util as ptu
 from rlkit.smm.smm_policy import hard_smm_point
 from rlkit.smm.smm_sampler import SMMSampler
@@ -53,7 +53,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             load_SMM =False,
             use_history=False,
             SMM_path=None,
-            num_skills = 1
+            num_skills = 1,
+            seed_sample=False
     ):
         """
         :param env: training env
@@ -102,8 +103,16 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         self.use_history = use_history,
         self.SMM_path = SMM_path
         self.num_skills = num_skills
+        self.seed_sample = seed_sample
 
         self.sampler = InPlacePathSampler(
+            env=env,
+            policy=agent,
+            max_path_length=self.max_path_length,
+        )
+
+        if self.seed_sample:
+            self.seedsampler = SeedInPlacePathSampler(
             env=env,
             policy=agent,
             max_path_length=self.max_path_length,
@@ -475,9 +484,14 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                     self.agent.infer_posterior(self.agent.context)
         else:
             while num_transitions < self.num_steps_per_eval:
-                path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                if self.seed_sample:
+                    path, num = self.seedsampler.obtain_samples(deterministic=self.eval_deterministic,
                                                         max_samples=self.num_steps_per_eval - num_transitions,
                                                         max_trajs=1, accum_context=True)
+                else:
+                    path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                                max_samples=self.num_steps_per_eval - num_transitions,
+                                                                max_trajs=1, accum_context=True)
                 paths += path
                 num_transitions += num
                 num_trajs += 1

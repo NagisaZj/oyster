@@ -1,5 +1,6 @@
 import numpy as np
-
+import rlkit.torch.pytorch_util as ptu
+import torch
 
 def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False):
     """
@@ -29,6 +30,8 @@ def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=F
     terminals = []
     agent_infos = []
     env_infos = []
+    z_means = []
+    z_vars = []
     o = env.reset()
     next_o = None
     path_length = 0
@@ -46,6 +49,8 @@ def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=F
         actions.append(a)
         agent_infos.append(agent_info)
         env_infos.append(env_info)
+        z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
+        z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
         path_length += 1
         if d:
             break
@@ -74,6 +79,94 @@ def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=F
         terminals=np.array(terminals).reshape(-1, 1),
         agent_infos=agent_infos,
         env_infos=env_infos,
+        z_means=z_means,
+        z_vars=z_vars
+    )
+
+def seedrollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False,random_seed=None):
+    """
+    The following value for the following keys will be a 2D array, with the
+    first dimension corresponding to the time dimension.
+     - observations
+     - actions
+     - rewards
+     - next_observations
+     - terminals
+
+    The next two elements will be lists of dictionaries, with the index into
+    the list being the index into the time
+     - agent_infos
+     - env_infos
+
+    :param env:
+    :param agent:
+    :param max_path_length:
+    :param animated:
+    :param accum_context: if True, accumulate the collected context
+    :return:
+    """
+    observations = []
+    actions = []
+    rewards = []
+    terminals = []
+    agent_infos = []
+    env_infos = []
+    z_means = []
+    z_vars = []
+    o = env.reset()
+    next_o = None
+    path_length = 0
+    if animated:
+        env.render()
+    while path_length < max_path_length:
+        if agent.context is None:
+            agent.z = ptu.FloatTensor(random_seed)
+        else:
+            agent.infer_posterior(agent.context)
+            agent.z = agent.z_means + torch.sqrt(agent.z_vars)*ptu.FloatTensor(random_seed)
+        a, agent_info = agent.get_action(o)
+        next_o, r, d, env_info = env.step(a)
+        # update the agent's current context
+        if accum_context:
+            agent.update_context([o, a, r, next_o, d, env_info])
+        observations.append(o)
+        rewards.append(r)
+        terminals.append(d)
+        actions.append(a)
+        agent_infos.append(agent_info)
+        env_infos.append(env_info)
+        z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
+        z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+        path_length += 1
+        if d:
+            break
+        o = next_o
+        if animated:
+            env.render()
+
+    actions = np.array(actions)
+    if len(actions.shape) == 1:
+        actions = np.expand_dims(actions, 1)
+    observations = np.array(observations)
+    if len(observations.shape) == 1:
+        observations = np.expand_dims(observations, 1)
+        next_o = np.array([next_o])
+    next_observations = np.vstack(
+        (
+            observations[1:, :],
+            np.expand_dims(next_o, 0)
+        )
+    )
+    return dict(
+        observations=observations,
+        actions=actions,
+        rewards=np.array(rewards).reshape(-1, 1),
+        next_observations=next_observations,
+        terminals=np.array(terminals).reshape(-1, 1),
+        agent_infos=agent_infos,
+        env_infos=env_infos,
+        z_means=z_means,
+        z_vars=z_vars
     )
 
 def SMMrollout(env, agent, max_path_length=np.inf, animated=False):

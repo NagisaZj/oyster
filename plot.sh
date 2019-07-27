@@ -8,7 +8,8 @@ python ./viskit/frontend.py ./results/hard-code/2019_07_06_20_15_38/  ./results/
 #running experiments
 CUDA_VISIBLE_DEVICES=7 python launch_experiment.py ./configs/sparse-point-robot-show.json
 CUDA_VISIBLE_DEVICES=0 python launch_experiment.py ./configs/ant-goal.json
-
+CUDA_VISIBLE_DEVICES=0 python launch_experiment.py ./configs/sparse-point-robot-show-seed.json
+CUDA_VISIBLE_DEVICES=1 python launch_experiment.py ./configs/goal-pitfall.json
 python ./viskit/frontend.py ./output/sparse-point-robot/2019_07_07_09_19_18/  ./output/sparse-point-robot/2019_07_07_09_19_23/ --port=5000
 
 python ./viskit/frontend.py ./output/sparse-point-robot/2019_07_07_09_19_18/  ./output/sparse-point-robot/2019_07_07_09_19_23/ ./SMMout/sparse-point-robot/2019_07_09_15_50_16/  ./SMMout/sparse-point-robot/2019_07_09_19_42_14/ ./SMMout/sparse-point-robot/2019_07_09_19_50_35/ ./SMMout/sparse-point-robot/2019_07_10_14_05_27/  --port=5005
