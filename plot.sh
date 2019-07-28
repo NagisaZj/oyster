@@ -18,3 +18,6 @@ python ./viskit/frontend.py ./output/sparse-point-robot/2019_07_07_09_19_18/  ./
 python ./viskit/frontend.py ./output1/sparse-point-robot/2019_07_10_18_53_50  ./output1/sparse-point-robot/2019_07_10_18_54_11 ./output1/sparse-point-robot/2019_07_10_18_54_33  --port=5005
 
 python ./viskit/frontend.py   /home/lthpc/Desktop/Research/Sampling/oyster/output1/ant-goal/2019_07_21_09_50_25       /home/lthpc/Desktop/Research/Sampling/oyster/output1/ant-goal/2019_07_21_10_01_21  --port=5005
+
+
+python ./viskit/frontend.py   /home/lthpc/Desktop/Research/Sampling/oyster/output1/sparse-point-robot/2019_07_27_14_04_25       /home/lthpc/Desktop/Research/Sampling/oyster/output1/sparse-point-robot/2019_07_27_14_04_36  /home/lthpc/Desktop/Research/Sampling/oyster/output1/sparse-point-robot/2019_07_27_14_39_13 --port=5005

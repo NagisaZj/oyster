@@ -8,36 +8,7 @@ import os
 import colour
 
 
-# config
-exp_id = '2019_07_07_09_19_18' # PEARL trainrew change
-#exp_id = '2019_07_07_09_19_23' # smm trainrew change
-exp_id = '2019_07_07_09_19_23'  #smm first trail
-#exp_id = '2019_07_07_09_19_18'  # PEARL first trial
 
-#smm only
-#exp_id = '2019_07_09_19_47_25'
-#exp_id = '2019_07_09_19_49_42'
-#exp_id = '2019_07_09_19_50_10'
-#exp_id = '2019_07_09_19_50_35'
-
-#changed smm
-#exp_id = '2019_07_09_15_50_16'
-#exp_id = '2019_07_09_15_50_39'
-#exp_id = '2019_07_09_15_51_40'
-#exp_id = '2019_07_09_15_52_02'
-
-#smm with another kind of reward
-exp_id = '2019_07_09_19_42_14'
-#exp_id = '2019_07_09_19_42_54'
-#exp_id = '2019_07_09_19_43_34'
-#exp_id = '2019_07_09_19_44_01'
-
-#tracking the rewards
-#exp_id = '2019_07_10_14_05_27'
-
-#tracking z
-#exp_id = '2019_07_12_09_06_15' #original
-#exp_id = '2019_07_12_09_06_38' #smm
 
 exp_id = '2019_07_27_14_04_36' #original
 #exp_id = '2019_07_27_14_04_25' #seed sampling
@@ -67,13 +38,17 @@ def load_pkl_prior():
 
 paths = load_pkl_prior()
 goals = [load_pkl(task)[0]['goal'] for task in range(tlow, thigh)]
+pitfalls = [load_pkl(task)[0]['pitfall'] for task in range(tlow, thigh)]
 
 plt.figure(figsize=(8,8))
 axes = plt.axes()
 axes.set(aspect='equal')
-plt.axis([-1.25, 1.25, -0.25, 1.25])
+plt.axis([-1.25, 1.25, -1.25, 1.25])
 for g in goals:
     circle = plt.Circle((g[0], g[1]), radius=gr)
+    axes.add_artist(circle)
+for p in pitfalls:
+    circle = plt.Circle((p[0], p[1]), radius=gr,color='r')
     axes.add_artist(circle)
 rewards = 0
 final_rewards = 0
@@ -128,10 +103,14 @@ for m in range(20):
 for j in range(3):
     for i in range(3):
         axes[i, j].set_xlim([-1.25, 1.25])
-        axes[i, j].set_ylim([-0.25, 1.25])
+        axes[i, j].set_ylim([-1.25, 1.25])
         for k, g in enumerate(goals):
             alpha = 1 if k == t else 0.2
             circle = plt.Circle((g[0], g[1]), radius=gr, alpha=alpha)
+            axes[i, j].add_artist(circle)
+        for k, p in enumerate(pitfalls):
+            alpha = 1 if k == t else 0.2
+            circle = plt.Circle((p[0], p[1]), radius=gr, alpha=alpha,color='r')
             axes[i, j].add_artist(circle)
         indices = list(np.linspace(0, len(all_paths[t]), num_trajs, endpoint=False).astype(np.int))
         counter = 0
@@ -150,7 +129,7 @@ fig.suptitle("iteration:%d, average reward of all tasks:%f"%(epoch,np.mean(rewar
 task = 19
 fig, axes = plt.subplots(1, 1)
 axes.set_xlim([-1.25, 1.25])
-axes.set_ylim([-0.25, 1.25])
+axes.set_ylim([-1.25, 1.25])
 for k, g in enumerate(goals):
             alpha = 0.2 if k == task else 0.2
             circle = plt.Circle((g[0], g[1]), radius=gr, alpha=alpha)

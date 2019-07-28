@@ -506,6 +506,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         goal = self.env._goal
         for path in paths:
             path['goal'] = goal # goal
+        if hasattr(self.env,"_pitfall"):
+            pitfall = self.env._pitfall
+            for path in paths:
+                path['pitfall'] = pitfall
 
         # save the paths for visualization, only useful for point mass
         if self.dump_eval_paths:
