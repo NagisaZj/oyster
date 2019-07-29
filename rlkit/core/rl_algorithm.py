@@ -195,7 +195,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                     self.task_idx = idx
                     self.env.reset_task(idx)
                     if not self.use_SMM:
-                        self.collect_data(self.num_initial_steps, 1, np.inf)
+                        if not self.seed_sample:
+                            self.collect_data(self.num_initial_steps, 1, np.inf)
+                        else:
+                            self.collect_data_seed(self.num_initial_steps, 1, np.inf,accumulate_context=False)
                     else:
                         self.collect_data_smm(self.num_initial_steps)
                         self.collect_data_policy(self.num_initial_steps, 1, np.inf)
@@ -207,16 +210,25 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                 self.enc_replay_buffer.task_buffers[idx].clear()
 
                 if not self.use_SMM:
-                    # collect some trajectories with z ~ prior
-                    if self.num_steps_prior > 0:
-                        self.collect_data(self.num_steps_prior, 1, np.inf)
-                    # collect some trajectories with z ~ posterior
-                    if self.num_steps_posterior > 0:
-                        self.collect_data(self.num_steps_posterior, 1, self.update_post_train)
-                    # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
-                    if self.num_extra_rl_steps_posterior > 0:
-                        self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,
-                                          add_to_enc_buffer=False)
+                    if not self.seed_sample:
+                        # collect some trajectories with z ~ prior
+                        if self.num_steps_prior > 0:
+                            self.collect_data(self.num_steps_prior, 1, np.inf)
+                        # collect some trajectories with z ~ posterior
+                        if self.num_steps_posterior > 0:
+                            self.collect_data(self.num_steps_posterior, 1, self.update_post_train)
+                        # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
+                        if self.num_extra_rl_steps_posterior > 0:
+                            self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,
+                                              add_to_enc_buffer=False)
+                    else:
+                        if self.num_steps_prior > 0:
+                            self.collect_data_seed(self.num_steps_prior, 1, np.inf,accumulate_context=False)
+                        if self.num_steps_posterior > 0:
+                            self.collect_data_seed(self.num_steps_posterior, 1, self.update_post_train)
+                        if self.num_extra_rl_steps_posterior > 0:
+                            self.collect_data_seed(self.num_extra_rl_steps_posterior, 1, self.update_post_train,
+                                              add_to_enc_buffer=False)
                 else:
                     if self.num_steps_prior > 0:
                         self.collect_data_smm(self.num_steps_prior)
@@ -323,6 +335,25 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             if update_posterior_rate != np.inf:
                 context = self.prepare_context(self.task_idx)
                 self.agent.infer_posterior(context)
+        self._n_env_steps_total += num_transitions
+        gt.stamp('sample')
+
+    def collect_data_seed(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True,add_to_policy_buffer=True,accumulate_context=True):
+        self.agent.clear_z()
+        num_transitions = 0
+        while num_transitions < num_samples:
+            paths, n_samples = self.seedsampler.obtain_samples(max_samples=num_samples - num_transitions,
+                                                                max_trajs=1,
+                                                                accum_context=accumulate_context
+                                                                )
+            num_transitions += n_samples
+            if add_to_policy_buffer:
+                self.replay_buffer.add_paths(self.task_idx, paths)
+            if add_to_enc_buffer:
+                self.enc_replay_buffer.add_paths(self.task_idx, paths)
+            #if update_posterior_rate != np.inf:
+            #    context = self.prepare_context(self.task_idx)
+            #    self.agent.infer_posterior(context)
         self._n_env_steps_total += num_transitions
         gt.stamp('sample')
 

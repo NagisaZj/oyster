@@ -40,14 +40,14 @@ exp_id = '2019_07_09_19_42_14'
 #exp_id = '2019_07_12_09_06_38' #smm
 
 exp_id = '2019_07_27_14_04_36' #original
-#exp_id = '2019_07_27_14_04_25' #seed sampling
-#exp_id = '2019_07_27_14_39_13' #seed sampling
+exp_id = '2019_07_28_15_13_39' #seed sampling
+exp_id = '2019_07_28_15_23_20' #seed sampling
 
 tlow, thigh = 80, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 240 # training epoch to load data from
+epoch = 135 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
 expdir = './output/sparse-point-robot/{}/eval_trajectories/'.format(exp_id) # directory to load data from
@@ -98,7 +98,7 @@ sample_locs = np.linspace(0, 0.9, num_trajs)
 colors = [cmap(s) for s in sample_locs]
 
 fig, axes = plt.subplots(3, 3, figsize=(12, 20))
-t = 11
+t = 0
 
 
 all_paths_rew = []
