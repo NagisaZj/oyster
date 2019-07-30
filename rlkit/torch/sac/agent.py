@@ -84,6 +84,7 @@ class PEARLAgent(nn.Module):
         self.sample_z()
         # reset the context collected so far
         self.context = None
+        self.one_step_context = None
         # reset any hidden state in the encoder network (relevant for RNN)
         self.context_encoder.reset(num_tasks)
 
@@ -111,6 +112,7 @@ class PEARLAgent(nn.Module):
             self.context = data
         else:
             self.context = torch.cat([self.context, data], dim=1)
+        self.one_step_context = data
 
     def compute_kl_div(self):
         ''' compute KL( q(z|c) || r(z) ) '''
@@ -128,6 +130,28 @@ class PEARLAgent(nn.Module):
         if self.use_ib:
             mu = params[..., :self.latent_dim]
             sigma_squared = F.softplus(params[..., self.latent_dim:])
+            z_params = [_product_of_gaussians(m, s) for m, s in zip(torch.unbind(mu), torch.unbind(sigma_squared))]
+            self.z_means = torch.stack([p[0] for p in z_params])
+            self.z_vars = torch.stack([p[1] for p in z_params])
+        # sum rather than product of gaussians structure
+        else:
+            self.z_means = torch.mean(params, dim=1)
+        self.sample_z()
+
+    def infer_posterior_one_step(self, context):
+        ''' compute q(z|c) as a function of input context and sample new z from it'''
+        params = self.context_encoder(context)
+        params = params.view(context.size(0), -1, self.context_encoder.output_size)
+        # with probabilistic z, predict mean and variance of q(z | c)
+        if self.use_ib:
+            mu = params[..., :self.latent_dim]
+            sigma_squared = F.softplus(params[..., self.latent_dim:])
+            self.z_means = torch.unsqueeze(self.z_means,1)
+            self.z_vars = torch.unsqueeze(self.z_vars, 1)
+            #print(mu.shape,self.z_means.shape)
+            mu = torch.cat([mu,self.z_means],dim=1)
+            sigma_squared = torch.cat([sigma_squared,self.z_vars],dim=1)
+            #print( mu.shape)
             z_params = [_product_of_gaussians(m, s) for m, s in zip(torch.unbind(mu), torch.unbind(sigma_squared))]
             self.z_means = torch.stack([p[0] for p in z_params])
             self.z_vars = torch.stack([p[1] for p in z_params])
