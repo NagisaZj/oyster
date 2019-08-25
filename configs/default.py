@@ -46,7 +46,9 @@ default_config = dict(
         use_history=False,  # whether use history average over SMM policies
         SMM_path = '/home/zj/Desktop/sample/smm/out/PointEnv-1-0.1/sac-smm-1-rl1.0-sec10.0-lec1.0-lcec1.0_2019_07_08_20_20_29_0000--s-0', # path to load SMM,
         num_skills = 1, # number of skills used by SMM, unused for now
-        seed_sample = False
+        seed_sample = False,
+        attention = False,
+        snail=False
     ),
     util_params=dict(
         base_log_dir='output1',

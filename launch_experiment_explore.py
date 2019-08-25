@@ -12,8 +12,8 @@ import torch
 from rlkit.envs import ENVS
 from rlkit.envs.wrappers import NormalizedBoxEnv
 from rlkit.torch.sac.policies import TanhGaussianPolicy, PEARLTanhGaussianPolicy
-from rlkit.torch.networks import FlattenMlp, MlpEncoder, RecurrentEncoder, AttentionEncoder, SnailEncoder
-from rlkit.torch.sac.sac import PEARLSoftActorCritic
+from rlkit.torch.networks import FlattenMlp, MlpEncoder, RecurrentEncoder
+from rlkit.torch.sac.sac import PEARLSoftActorCritic, ExpSoftActorCritic
 from rlkit.torch.sac.agent import PEARLAgent
 from rlkit.launchers.launcher_util import setup_logger
 import rlkit.torch.pytorch_util as ptu
@@ -38,17 +38,14 @@ def experiment(variant):
     net_size = variant['net_size']
     recurrent = variant['algo_params']['recurrent']
     encoder_model = RecurrentEncoder if recurrent else MlpEncoder
-    if recurrent and variant['algo_params']['attention']:
-        encoder_model = AttentionEncoder
-
-    if recurrent and variant['algo_params']['snail']:
-        encoder_model = SnailEncoder
 
     context_encoder = encoder_model(
         hidden_sizes=[200, 200, 200],
         input_size=context_encoder_input_dim,
         output_size=context_encoder_output_dim,
     )
+    context_encoder.use_next_obs_in_context = variant['algo_params'][
+        'use_next_obs_in_context']
     qf1 = FlattenMlp(
         hidden_sizes=[net_size, net_size, net_size],
         input_size=obs_dim + action_dim + latent_dim,
@@ -70,18 +67,33 @@ def experiment(variant):
         latent_dim=latent_dim,
         action_dim=action_dim,
     )
-    agent = PEARLAgent(
-        latent_dim,
-        context_encoder,
-        policy,
-        **variant['algo_params']
+
+    qf1_exp = FlattenMlp(
+        hidden_sizes=[net_size, net_size, net_size],
+        input_size=obs_dim + action_dim,
+        output_size=1,
     )
-    algorithm = PEARLSoftActorCritic(
+    qf2_exp = FlattenMlp(
+        hidden_sizes=[net_size, net_size, net_size],
+        input_size=obs_dim + action_dim,
+        output_size=1,
+    )
+    vf_exp = FlattenMlp(
+        hidden_sizes=[net_size, net_size, net_size],
+        input_size=obs_dim,
+        output_size=1,
+    )
+    policy_exp = TanhGaussianPolicy(
+        hidden_sizes=[net_size, net_size, net_size],
+        obs_dim=obs_dim,
+        action_dim=action_dim,
+     )
+    algorithm = ExpSoftActorCritic(
         env=env,
         train_tasks=list(tasks[:variant['n_train_tasks']]),
         eval_tasks=list(tasks[-variant['n_eval_tasks']:]),
-        nets=[agent, qf1, qf2, vf],
-        latent_dim=latent_dim,
+        nets=[policy_exp, qf1_exp, qf2_exp, vf_exp],
+        encoder=context_encoder,
         **variant['algo_params']
     )
 
@@ -89,17 +101,20 @@ def experiment(variant):
     if variant['path_to_weights'] is not None:
         path = variant['path_to_weights']
         context_encoder.load_state_dict(torch.load(os.path.join(path, 'context_encoder.pth')))
-        qf1.load_state_dict(torch.load(os.path.join(path, 'qf1.pth')))
-        qf2.load_state_dict(torch.load(os.path.join(path, 'qf2.pth')))
-        vf.load_state_dict(torch.load(os.path.join(path, 'vf.pth')))
+        #qf1.load_state_dict(torch.load(os.path.join(path, 'qf1.pth')))
+        #qf2.load_state_dict(torch.load(os.path.join(path, 'qf2.pth')))
+        #vf.load_state_dict(torch.load(os.path.join(path, 'vf.pth')))
         # TODO hacky, revisit after model refactor
-        algorithm.networks[-2].load_state_dict(torch.load(os.path.join(path, 'target_vf.pth')))
-        policy.load_state_dict(torch.load(os.path.join(path, 'policy.pth')))
+        #algorithm.networks[-2].load_state_dict(torch.load(os.path.join(path, 'target_vf.pth')))
+        #policy.load_state_dict(torch.load(os.path.join(path, 'policy.pth')))
 
     # optional GPU mode
     ptu.set_gpu_mode(variant['util_params']['use_gpu'], variant['util_params']['gpu_id'])
     if ptu.gpu_enabled():
-        algorithm.to()
+        device = torch.device('cuda:0')
+        print(device)
+        algorithm.to(device)
+        context_encoder.to(device)
 
     # debugging triggers a lot of printing and logs to a debug directory
     DEBUG = variant['util_params']['debug']

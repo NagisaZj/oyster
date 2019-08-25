@@ -1,6 +1,7 @@
 import numpy as np
 import rlkit.torch.pytorch_util as ptu
 import torch
+import torch.nn.functional as F
 
 def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False):
     """
@@ -238,6 +239,107 @@ def SMMrollout(env, agent, max_path_length=np.inf, animated=False):
         terminals=np.array(terminals).reshape(-1, 1),
         agent_infos=agent_infos,
         env_infos=env_infos,
+    )
+
+def exprollout(env, agent, encoder, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False):
+    """
+    The following value for the following keys will be a 2D array, with the
+    first dimension corresponding to the time dimension.
+     - observations
+     - actions
+     - rewards
+     - next_observations
+     - terminals
+
+    The next two elements will be lists of dictionaries, with the index into
+    the list being the index into the time
+     - agent_infos
+     - env_infos
+
+    :param env:
+    :param agent:
+    :param max_path_length:
+    :param animated:
+    :param accum_context: if True, accumulate the collected context
+    :return:
+    """
+    observations = []
+    actions = []
+    rewards = []
+    terminals = []
+    agent_infos = []
+    env_infos = []
+    z_means = []
+    z_vars = []
+    o = env.reset()
+    next_o = None
+    path_length = 0
+    if animated:
+        env.render()
+    while path_length < max_path_length:
+        a, agent_info = agent.get_action(o)
+        next_o, r, d, env_info = env.step(a)
+        r=env_info['sparse_reward']
+        # update the agent's current context
+
+
+        ot = ptu.from_numpy(o[None, None, ...])
+        at = ptu.from_numpy(a[None, None, ...])
+        rt = ptu.from_numpy(np.array([r])[None, None, ...])
+        nott = ptu.from_numpy(next_o[None, None, ...])
+        if encoder.use_next_obs_in_context:
+            data = torch.cat([ot, at, rt, nott], dim=2)
+        else:
+            data = torch.cat([ot, at, rt], dim=2)
+        #print(encoder.device)
+        #for params in encoder.parameters():
+        #    print(params.device)
+
+        params = encoder(data)
+        params = params.view(data.size(0), -1, encoder.output_size)
+        sigma_squared = F.softplus(params[..., int(encoder.output_size/2):])
+        reward = -1 * torch.mean(torch.log(sigma_squared))
+        r = reward.cpu().data.numpy()
+
+
+        observations.append(o)
+        rewards.append(r)
+        terminals.append(d)
+        actions.append(a)
+        agent_infos.append(agent_info)
+        env_infos.append(env_info)
+        #z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
+        #z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+        path_length += 1
+        if d:
+            break
+        o = next_o
+        if animated:
+            env.render()
+
+    actions = np.array(actions)
+    if len(actions.shape) == 1:
+        actions = np.expand_dims(actions, 1)
+    observations = np.array(observations)
+    if len(observations.shape) == 1:
+        observations = np.expand_dims(observations, 1)
+        next_o = np.array([next_o])
+    next_observations = np.vstack(
+        (
+            observations[1:, :],
+            np.expand_dims(next_o, 0)
+        )
+    )
+    return dict(
+        observations=observations,
+        actions=actions,
+        rewards=np.array(rewards).reshape(-1, 1),
+        next_observations=next_observations,
+        terminals=np.array(terminals).reshape(-1, 1),
+        agent_infos=agent_infos,
+        env_infos=env_infos,
+        z_means=z_means,
+        z_vars=z_vars
     )
 
 def split_paths(paths):

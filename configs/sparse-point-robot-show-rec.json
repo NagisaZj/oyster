@@ -22,9 +22,10 @@
         "sparse_rewards": 1,
         "kl_lambda": 1.0,
         "num_exp_traj_eval": 5,
-        "dump_eval_paths":1
+        "dump_eval_paths":1,
+        "recurrent": 1
     },
-    "util_params": {
+  "util_params": {
         "base_log_dir":"outputa"
 
     }

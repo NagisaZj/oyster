@@ -9,55 +9,22 @@ import colour
 
 
 # config
-exp_id = '2019_07_07_09_19_18' # PEARL trainrew change
-#exp_id = '2019_07_07_09_19_23' # smm trainrew change
-exp_id = '2019_07_07_09_19_23'  #smm first trail
-#exp_id = '2019_07_07_09_19_18'  # PEARL first trial
 
-#smm only
-#exp_id = '2019_07_09_19_47_25'
-#exp_id = '2019_07_09_19_49_42'
-#exp_id = '2019_07_09_19_50_10'
-#exp_id = '2019_07_09_19_50_35'
 
-#changed smm
-#exp_id = '2019_07_09_15_50_16'
-#exp_id = '2019_07_09_15_50_39'
-#exp_id = '2019_07_09_15_51_40'
-#exp_id = '2019_07_09_15_52_02'
-
-#smm with another kind of reward
-exp_id = '2019_07_09_19_42_14'
-#exp_id = '2019_07_09_19_42_54'
-#exp_id = '2019_07_09_19_43_34'
-#exp_id = '2019_07_09_19_44_01'
-
-#tracking the rewards
-#exp_id = '2019_07_10_14_05_27'
-
-#tracking z
-#exp_id = '2019_07_12_09_06_15' #original
-#exp_id = '2019_07_12_09_06_38' #smm
-
-exp_id = '2019_07_27_14_04_36' #original
-exp_id = '2019_07_28_15_13_39' #seed sampling
-exp_id = '2019_07_28_15_23_20' #seed sampling
-
-exp_id = '2019_08_21_09_15_52' #recurrent
-#exp_id = '2019_08_21_09_15_55' #recurrent
+exp_id = '2019_08_15_14_07_30' #original
+#exp_id = '2019_08_15_14_32_06' #seed sampling
 
 
 tlow, thigh = 80, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 499 # training epoch to load data from
+epoch = 400 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
-expdir = './output/sparse-point-robot/{}/eval_trajectories/'.format(exp_id) # directory to load data from
-expdir = './SMMout/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
-expdir = './output1/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
-#expdir = './output_z/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+
+expdir = './outputt/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+
 # helpers
 def load_pkl(task):
     with open(os.path.join(expdir, 'task{}-epoch{}-run0.pkl'.format(task, epoch)), 'rb') as f:
