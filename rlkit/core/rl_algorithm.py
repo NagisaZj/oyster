@@ -673,7 +673,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         """
         pass
 
-class MetaExpAlgorithm(metaclass=abc.ABCMeta):
+class ExpAlgorithm(metaclass=abc.ABCMeta):
     def __init__(
             self,
             env,
@@ -713,7 +713,11 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
             use_history=False,
             SMM_path=None,
             num_skills = 1,
-            seed_sample=False
+            seed_sample=False,
+            snail=False,
+            meta_episode_len=10,
+            num_trajs = 2,
+            num_trajs_eval=1
     ):
         """
         :param env: training env
@@ -764,6 +768,9 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
         self.SMM_path = SMM_path
         self.num_skills = num_skills
         self.seed_sample = seed_sample
+        self.meta_episode_len = meta_episode_len
+        self.num_trajs = num_trajs
+        self.num_trajs_eval = num_trajs_eval
 
         self.sampler = ExpInPlacePathSampler(
             env=env,
@@ -782,11 +789,7 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
                 self.train_tasks,
             )
 
-        self.enc_replay_buffer = MultiTaskReplayBuffer(
-                self.replay_buffer_size,
-                env,
-                self.train_tasks,
-        )
+
 
         self._n_env_steps_total = 0
         self._n_train_steps_total = 0
@@ -838,22 +841,17 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
                 for idx in self.train_tasks:
                     self.task_idx = idx
                     self.env.reset_task(idx)
-                    self.collect_data(self.num_initial_steps, 1, np.inf)
+                    for _ in range(self.num_trajs):
+                        self.collect_data(self.meta_episode_len)
             # Sample data from train tasks.
             for i in range(self.num_tasks_sample):
                 idx = np.random.randint(len(self.train_tasks))
                 self.task_idx = idx
                 self.env.reset_task(idx)
-                self.enc_replay_buffer.task_buffers[idx].clear()
-                if self.num_steps_prior > 0:
-                    self.collect_data(self.num_steps_prior, 1, np.inf)
-                if self.num_steps_posterior > 0:
-                    self.collect_data(self.num_steps_posterior, 1, self.update_post_train)
-                if self.num_extra_rl_steps_posterior > 0:
-                    self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,
-                                      add_to_enc_buffer=False)
+                for _ in range(self.num_trajs):
+                    self.collect_data(self.meta_episode_len)
 
-
+            print('collect over')
 
             # Sample train tasks and compute gradient updates on parameters.
             for train_step in range(self.num_train_steps_per_itr):
@@ -879,7 +877,7 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
 
 
 
-    def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True,add_to_policy_buffer=True):
+    def collect_data(self, num_episodes):
         '''
         get trajectories from current env in batch mode with given policy
         collect complete trajectories until the number of collected transitions >= num_samples
@@ -892,25 +890,20 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
         '''
         # start from the prior
 
-        num_transitions = 0
-        while num_transitions < num_samples:
-            paths, n_samples = self.sampler.obtain_samples(max_samples=num_samples - num_transitions,
-                                                                max_trajs=update_posterior_rate,
-                                                                accum_context=False,
-                                                                resample=resample_z_rate)
-            num_transitions += n_samples
-            if add_to_policy_buffer:
-                self.replay_buffer.add_paths(self.task_idx, paths)
-            if add_to_enc_buffer:
-                self.enc_replay_buffer.add_paths(self.task_idx, paths)
-        self._n_env_steps_total += num_transitions
+
+        paths, n_samples = self.sampler.obtain_samples(max_trajs=num_episodes)
+
+
+        self.replay_buffer.add_paths(self.task_idx, paths)
+
+        self._n_env_steps_total += n_samples
         gt.stamp('sample')
 
 
     def _try_to_eval(self, epoch):
         logger.save_extra_data(self.get_extra_data_to_save(epoch))
         if self._can_evaluate():
-            self.evaluate(epoch)
+            self.evaluate(epoch,self.num_trajs)
 
             params = self.get_epoch_snapshot(epoch)
             logger.save_itr_params(epoch, params)
@@ -1025,23 +1018,19 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
             data_to_save['algorithm'] = self
         return data_to_save
 
-    def collect_paths(self, idx, epoch, run):
+    def collect_paths(self, idx, epoch, run,num_trajs):
         self.task_idx = idx
         self.env.reset_task(idx)
 
         #self.agent.clear_z()
         paths = []
         num_transitions = 0
-        num_trajs = 0
-
-        while num_transitions < self.num_steps_per_eval:
-
-            path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
-                                                        max_samples=self.num_steps_per_eval - num_transitions,
-                                                        max_trajs=1, accum_context=True)
+        for _ in range(self.num_trajs_eval):
+            path, num = self.sampler.obtain_samples(
+                                                max_trajs=self.meta_episode_len)
             paths += path
             num_transitions += num
-            num_trajs += 1
+
             #if num_trajs >= self.num_exp_traj_eval:
             #    self.agent.infer_posterior(self.agent.context)
 
@@ -1070,7 +1059,7 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
         for idx in indices:
             all_rets = []
             for r in range(self.num_evals):
-                paths = self.collect_paths(idx, epoch, r)
+                paths = self.collect_paths(idx, epoch, r,self.num_trajs)
                 all_rets.append([eval_util.get_average_returns([p]) for p in paths])
             final_returns.append(np.mean([np.mean(a) for a in all_rets]))
             # record online returns for the first n trajectories
@@ -1082,7 +1071,7 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
         online_returns = [t[:n] for t in online_returns]
         return final_returns, online_returns
 
-    def evaluate(self, epoch):
+    def evaluate(self, epoch,num_trajs):
         if self.eval_statistics is None:
             self.eval_statistics = OrderedDict()
 
@@ -1092,10 +1081,7 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
             # just want stochasticity of z, not the policy
             #self.agent.clear_z()
             #if not self.use_SMM:
-            prior_paths, _ = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
-                                                             max_samples=self.max_path_length * 20,
-                                                        accum_context=False,
-                                                        resample=1)
+            prior_paths, _ = self.sampler.obtain_samples(max_trajs=self.meta_episode_len)
             #else:
             #    prior_paths, _ = self.smm_sampler.obtain_samples(
             #                                                 max_samples=self.max_path_length * 20,
@@ -1112,13 +1098,8 @@ class MetaExpAlgorithm(metaclass=abc.ABCMeta):
             self.task_idx = idx
             self.env.reset_task(idx)
             paths = []
-            for _ in range(self.num_steps_per_eval // self.max_path_length):
-                #context = self.sample_context(idx)
-                #self.agent.infer_posterior(context)
-                p, _ = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.max_path_length,
-                                                        accum_context=False,
-                                                        max_trajs=1,
-                                                        resample=np.inf)
+            for _ in range(self.num_trajs_eval):
+                p, _ = self.sampler.obtain_samples(max_trajs=self.meta_episode_len)
                 paths += p
 
             #if self.sparse_rewards:

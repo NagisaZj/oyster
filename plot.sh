@@ -12,6 +12,7 @@ CUDA_VISIBLE_DEVICES=0 python launch_experiment.py ./configs/sparse-point-robot-
 CUDA_VISIBLE_DEVICES=0 python launch_experiment_explore.py ./configs/sparse-point-robot-show-exp.json --gpu 1
 python launch_experiment.py ./configs/sparse-point-robot-show-atten.json --gpu 1
 python launch_experiment.py ./configs/sparse-point-robot-show-snail.json --gpu 0
+python launch_experiment_explore.py ./configs/sparse-point-robot-show-exp.json --gpu 0
 CUDA_VISIBLE_DEVICES=1 python launch_experiment.py ./configs/goal-pitfall.json
 CUDA_VISIBLE_DEVICES=1 python launch_experiment.py ./configs/goal-pitfall-seed.json
 python ./viskit/frontend.py ./output/sparse-point-robot/2019_07_07_09_19_18/  ./output/sparse-point-robot/2019_07_07_09_19_23/ --port=5000
@@ -30,4 +31,4 @@ python ./viskit/frontend.py  ./output1/sparse-point-robot/2019_07_27_14_04_36  .
 
 python ./viskit/frontend.py  /home/lthpc/Desktop/Research/Sampling/oyster/output1/goal-pitfall/2019_07_28_10_33_54  /home/lthpc/Desktop/Research/Sampling/oyster/output1/goal-pitfall/2019_07_28_22_02_20   --port=5002
 
-python ./viskit/frontend.py ./outputa/sparse-point-robot/2019_08_24_16_15_02  ./outputa/sparse-point-robot/2019_08_24_16_15_09  ./outputa/sparse-point-robot/2019_08_24_16_15_18  ./output1/sparse-point-robot/2019_07_27_14_04_36 --port=5005
+python ./viskit/frontend.py ./outputa/sparse-point-robot/2019_08_25_19_19_52  ./outputa/sparse-point-robot/2019_08_25_19_20_39  ./outputa/sparse-point-robot/2019_08_25_19_20_58    --port=5005

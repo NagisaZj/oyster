@@ -241,7 +241,7 @@ def SMMrollout(env, agent, max_path_length=np.inf, animated=False):
         env_infos=env_infos,
     )
 
-def exprollout(env, agent, encoder, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False):
+def exprollout(env, agent, max_path_length,  max_trajs):
     """
     The following value for the following keys will be a 2D array, with the
     first dimension corresponding to the time dimension.
@@ -271,51 +271,36 @@ def exprollout(env, agent, encoder, max_path_length=np.inf, accum_context=True, 
     env_infos = []
     z_means = []
     z_vars = []
-    o = env.reset()
-    next_o = None
-    path_length = 0
-    if animated:
-        env.render()
-    while path_length < max_path_length:
-        a, agent_info = agent.get_action(o)
-        next_o, r, d, env_info = env.step(a)
-        r=env_info['sparse_reward']
-        # update the agent's current context
+    num_trajs = 0
+    agent.clear_z()
+    while num_trajs<max_trajs:
+        o = env.reset()
+        next_o = None
+        path_length = 0
+        while path_length < max_path_length:
+            a, agent_info = agent.get_action(o)
+            #print(a)
+            next_o, r, d, env_info = env.step(a)
+            r = env_info['sparse_reward']
+            # update the agent's current context
 
+            agent.update_context([o,a,r,next_o,d,env_info])
+            r = agent.infer_reward()
 
-        ot = ptu.from_numpy(o[None, None, ...])
-        at = ptu.from_numpy(a[None, None, ...])
-        rt = ptu.from_numpy(np.array([r])[None, None, ...])
-        nott = ptu.from_numpy(next_o[None, None, ...])
-        if encoder.use_next_obs_in_context:
-            data = torch.cat([ot, at, rt, nott], dim=2)
-        else:
-            data = torch.cat([ot, at, rt], dim=2)
-        #print(encoder.device)
-        #for params in encoder.parameters():
-        #    print(params.device)
+            observations.append(o)
+            rewards.append(r)
+            terminals.append(d)
+            actions.append(a)
+            agent_infos.append(agent_info)
+            env_infos.append(env_info)
+            # z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
+            # z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+            path_length += 1
+            if d:
+                break
+            o = next_o
 
-        params = encoder(data)
-        params = params.view(data.size(0), -1, encoder.output_size)
-        sigma_squared = F.softplus(params[..., int(encoder.output_size/2):])
-        reward = -1 * torch.mean(torch.log(sigma_squared))
-        r = reward.cpu().data.numpy()
-
-
-        observations.append(o)
-        rewards.append(r)
-        terminals.append(d)
-        actions.append(a)
-        agent_infos.append(agent_info)
-        env_infos.append(env_info)
-        #z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
-        #z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
-        path_length += 1
-        if d:
-            break
-        o = next_o
-        if animated:
-            env.render()
+        num_trajs+=1
 
     actions = np.array(actions)
     if len(actions.shape) == 1:

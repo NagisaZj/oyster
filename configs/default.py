@@ -59,5 +59,53 @@ default_config = dict(
     )
 )
 
+default_config_exp = dict(
+    env_name='cheetah-dir',
+    n_train_tasks=2,
+    n_eval_tasks=2,
+    latent_size=10, # dimension of the latent context vector
+    net_size=300, # number of units per FC layer in each network
+    path_to_weights=None, # path to pre-trained weights to load into networks
+    env_params=dict(
+        n_tasks=2, # number of distinct tasks in this domain, shoudl equal sum of train and eval tasks
+        randomize_tasks=True, # shuffle the tasks after creating them
+    ),
+    algo_params=dict(
+        num_tasks_sample=80, # number of randomly sampled tasks to collect data for each iteration
+        num_train_steps_per_itr=2000, # number of meta-gradient steps taken per iteration
+        num_evals=2, # number of independent evals
+        num_steps_per_eval=600,  # nuumber of transitions to eval on
+        batch_size=256, # number of transitions in the RL batch
+        max_path_length=50, # max path length for this environment
+        discount=0.99, # RL discount factor
+        embedding_batch_size=128, # number of transitions in the context batch
+        embedding_mini_batch_size=128,
+        soft_target_tau=0.005, # for SAC target network update
+        policy_lr=3E-4,
+        qf_lr=3E-4,
+        vf_lr=3E-4,
+        context_lr=3e-4,
+        reward_scale=5., # scale rewards before constructing Bellman update, effectively controls weight on the entropy of the policy
+        sparse_rewards=False, # whether to sparsify rewards as determined in env
+        kl_lambda=.1, # weight on KL divergence term in encoder loss
+        use_information_bottleneck=True, # False makes latent context deterministic
+        use_next_obs_in_context=False, # use next obs if it is useful in distinguishing tasks
+        update_post_train=1, # how often to resample the context when collecting data during training (in trajectories)
+        recurrent=False, # recurrent or permutation-invariant encoder
+        dump_eval_paths=False, # whether to save evaluation trajectories
+        snail=False,
+        meta_episode_len = 3,
+        num_trajs = 5,
+        num_trajs_eval = 5
+    ),
+    util_params=dict(
+        base_log_dir='output1',
+        use_gpu=True,
+        gpu_id=0,
+        debug=False, # debugging triggers printing and writes logs to debug directory
+        docker=False, # TODO docker is not yet supported
+    )
+)
+
 
 

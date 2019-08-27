@@ -12,12 +12,12 @@ import torch
 from rlkit.envs import ENVS
 from rlkit.envs.wrappers import NormalizedBoxEnv
 from rlkit.torch.sac.policies import TanhGaussianPolicy, PEARLTanhGaussianPolicy
-from rlkit.torch.networks import FlattenMlp, MlpEncoder, RecurrentEncoder
-from rlkit.torch.sac.sac import PEARLSoftActorCritic, ExpSoftActorCritic
-from rlkit.torch.sac.agent import PEARLAgent
+from rlkit.torch.networks import FlattenMlp, MlpEncoder, RecurrentEncoder, SnailEncoder
+from rlkit.torch.sac.sac import PEARLSoftActorCritic, ExpSAC
+from rlkit.torch.sac.agent import PEARLAgent, ExpAgent
 from rlkit.launchers.launcher_util import setup_logger
 import rlkit.torch.pytorch_util as ptu
-from configs.default import default_config
+from configs.default import default_config_exp as default_config
 
 
 def experiment(variant):
@@ -38,6 +38,8 @@ def experiment(variant):
     net_size = variant['net_size']
     recurrent = variant['algo_params']['recurrent']
     encoder_model = RecurrentEncoder if recurrent else MlpEncoder
+    if recurrent and variant['algo_params']['snail']:
+        encoder_model = SnailEncoder
 
     context_encoder = encoder_model(
         hidden_sizes=[200, 200, 200],
@@ -46,53 +48,35 @@ def experiment(variant):
     )
     context_encoder.use_next_obs_in_context = variant['algo_params'][
         'use_next_obs_in_context']
-    qf1 = FlattenMlp(
-        hidden_sizes=[net_size, net_size, net_size],
-        input_size=obs_dim + action_dim + latent_dim,
-        output_size=1,
-    )
-    qf2 = FlattenMlp(
-        hidden_sizes=[net_size, net_size, net_size],
-        input_size=obs_dim + action_dim + latent_dim,
-        output_size=1,
-    )
-    vf = FlattenMlp(
-        hidden_sizes=[net_size, net_size, net_size],
-        input_size=obs_dim + latent_dim,
-        output_size=1,
-    )
-    policy = PEARLTanhGaussianPolicy(
-        hidden_sizes=[net_size, net_size, net_size],
-        obs_dim=obs_dim + latent_dim,
-        latent_dim=latent_dim,
-        action_dim=action_dim,
-    )
+
 
     qf1_exp = FlattenMlp(
         hidden_sizes=[net_size, net_size, net_size],
-        input_size=obs_dim + action_dim,
+        input_size=obs_dim + action_dim + context_encoder_output_dim,
         output_size=1,
     )
     qf2_exp = FlattenMlp(
         hidden_sizes=[net_size, net_size, net_size],
-        input_size=obs_dim + action_dim,
+        input_size=obs_dim + action_dim + context_encoder_output_dim,
         output_size=1,
     )
     vf_exp = FlattenMlp(
         hidden_sizes=[net_size, net_size, net_size],
-        input_size=obs_dim,
+        input_size=obs_dim + context_encoder_output_dim,
         output_size=1,
     )
-    policy_exp = TanhGaussianPolicy(
+    policy_exp = PEARLTanhGaussianPolicy(
         hidden_sizes=[net_size, net_size, net_size],
-        obs_dim=obs_dim,
+        obs_dim=obs_dim + context_encoder_output_dim,
         action_dim=action_dim,
+        latent_dim=latent_dim
      )
-    algorithm = ExpSoftActorCritic(
+    agent = ExpAgent(latent_dim,context_encoder,policy_exp,**variant['algo_params'])
+    algorithm = ExpSAC(
         env=env,
         train_tasks=list(tasks[:variant['n_train_tasks']]),
         eval_tasks=list(tasks[-variant['n_eval_tasks']:]),
-        nets=[policy_exp, qf1_exp, qf2_exp, vf_exp],
+        nets=[agent, qf1_exp, qf2_exp, vf_exp],
         encoder=context_encoder,
         **variant['algo_params']
     )

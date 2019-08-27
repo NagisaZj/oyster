@@ -7,7 +7,7 @@ from torch import nn as nn
 
 import rlkit.torch.pytorch_util as ptu
 from rlkit.core.eval_util import create_stats_ordered_dict
-from rlkit.core.rl_algorithm import MetaRLAlgorithm, MetaExpAlgorithm
+from rlkit.core.rl_algorithm import MetaRLAlgorithm, ExpAlgorithm
 from rlkit.torch.torch_rl_algorithm import TorchRLAlgorithm
 from rlkit.torch.sac.policies import MakeDeterministic
 
@@ -177,7 +177,6 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
         ptu.soft_update_from_to(self.vf, self.target_vf, self.soft_target_tau)
 
     def _take_step(self, indices, context):
-
         num_tasks = len(indices)
 
         # data is (task, batch, feat)
@@ -307,7 +306,7 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
         return snapshot
 
 
-class ExpSoftActorCritic(MetaExpAlgorithm):
+class ExpSAC(ExpAlgorithm):
     def __init__(
             self,
             env,
@@ -430,11 +429,12 @@ class ExpSoftActorCritic(MetaExpAlgorithm):
         # make method work given a single task index
         if not hasattr(indices, '__iter__'):
             indices = [indices]
-        batches = [ptu.np_to_pytorch_batch(self.enc_replay_buffer.random_batch(idx, batch_size=self.embedding_batch_size, sequence=self.recurrent)) for idx in indices]
+        batches = [ptu.np_to_pytorch_batch(self.replay_buffer.random_batch(idx, batch_size=self.embedding_batch_size, sequence=self.recurrent)) for idx in indices]
         context = [self.unpack_batch(batch, sparse_reward=self.sparse_rewards) for batch in batches]
         # group like elements together
         context = [[x[i] for x in context] for i in range(len(context[0]))]
         context = [torch.cat(x, dim=0) for x in context]
+        context_unbatched = context
         # full context consists of [obs, act, rewards, next_obs, terms]
         # if dynamics don't change across tasks, don't include next_obs
         # don't include terminals in context
@@ -442,7 +442,7 @@ class ExpSoftActorCritic(MetaExpAlgorithm):
             context = torch.cat(context[:-1], dim=2)
         else:
             context = torch.cat(context[:-2], dim=2)
-        return context
+        return context, context_unbatched
 
     ##### Training #####
     def _do_training(self, indices):
@@ -450,54 +450,63 @@ class ExpSoftActorCritic(MetaExpAlgorithm):
         num_updates = self.embedding_batch_size // mb_size
 
         # sample context batch
-        #context_batch = self.sample_context(indices)
-
+        context_batch,context_unbatched = self.sample_context(indices)
+        obs_batch, actions_batch, rewards_batch, next_obs_batch, terms_batch = context_unbatched
         # zero out context and hidden encoder state
-        #self.agent.clear_z(num_tasks=len(indices))
+        self.agent.clear_z(num_tasks=len(indices))
 
         # do this in a loop so we can truncate backprop in the recurrent encoder
         for i in range(num_updates):
-            #context = context_batch[:, i * mb_size: i * mb_size + mb_size, :]
-            self._take_step(indices)
+            '''context = context_batch[:, i * mb_size: i * mb_size + mb_size, :]
+            obs = obs_batch[:, i * mb_size: i * mb_size + mb_size, :]
+            a = actions_batch[:, i * mb_size: i * mb_size + mb_size, :]
+            r = rewards_batch[:, i * mb_size: i * mb_size + mb_size, :]
+            n_obs = next_obs_batch[:, i * mb_size: i * mb_size + mb_size, :]
+            t = terms_batch[:, i * mb_size: i * mb_size + mb_size, :]'''
+            self._take_step(indices,context_batch,obs_batch,actions_batch,rewards_batch,next_obs_batch,terms_batch)
 
             # stop backprop
-            #self.agent.detach_z()
+            self.agent.detach_z()
 
-    def _min_q(self, obs, actions):
+    def _min_q(self, obs, actions,encoder_output):
         #print(obs.shape,actions.shape)
-        q1 = self.qf1(obs, actions)
-        q2 = self.qf2(obs, actions)
+        q1 = self.qf1(obs, actions,encoder_output)
+        q2 = self.qf2(obs, actions,encoder_output)
         min_q = torch.min(q1, q2)
         return min_q
 
     def _update_target_network(self):
         ptu.soft_update_from_to(self.vf, self.target_vf, self.soft_target_tau)
 
-    def _take_step(self, indices):
+    def _take_step(self, indices, context,obs,a,r,n_obs,t):
 
         num_tasks = len(indices)
 
         # data is (task, batch, feat)
-        obs, actions, rewards, next_obs, terms = self.sample_sac(indices)
+        obs, actions, rewards, next_obs, terms = obs,a,r,n_obs,t
 
         # run inference in networks
-        policy_outputs = self.agent(obs, reparameterize=True, return_log_prob=True)
+        policy_outputs ,encoder_output = self.agent(obs, context)
         new_actions, policy_mean, policy_log_std, log_pi = policy_outputs[:4]
+        encoder_output = encoder_output.detach()
+        encoder_next = torch.cat((encoder_output[:, 1:,:], torch.unsqueeze(encoder_output[:, -1,:],1)), dim=1)
 
         # flattens out the task dimension
         t, b, _ = obs.size()
         obs = obs.view(t * b, -1)
         actions = actions.view(t * b, -1)
         next_obs = next_obs.view(t * b, -1)
-
+        encoder_output = encoder_output.view(t * b, -1)
+        encoder_next = encoder_next.view(t * b, -1)
         # Q and V networks
         # encoder will only get gradients from Q nets
-        q1_pred = self.qf1(obs, actions)
-        q2_pred = self.qf2(obs, actions)
-        v_pred = self.vf(obs)
+        q1_pred = self.qf1(obs, actions,encoder_output)
+        q2_pred = self.qf2(obs, actions,encoder_output)
+        v_pred = self.vf(obs,encoder_output)
         # get targets for use in V and Q updates
+
         with torch.no_grad():
-            target_v_values = self.target_vf(next_obs)
+            target_v_values = self.target_vf(next_obs,encoder_next)
 
         # KL constraint on z if probabilistic
         '''self.context_optimizer.zero_grad()
@@ -509,10 +518,10 @@ class ExpSoftActorCritic(MetaExpAlgorithm):
         # qf and encoder update (note encoder does not get grads from policy or vf)
         self.qf1_optimizer.zero_grad()
         self.qf2_optimizer.zero_grad()
-        rewards_flat = rewards.view(self.batch_size * num_tasks, -1)
+        rewards_flat = rewards.view(t*b, -1)
         # scale rewards for Bellman update
         rewards_flat = rewards_flat * self.reward_scale
-        terms_flat = terms.view(self.batch_size * num_tasks, -1)
+        terms_flat = terms.view(t*b, -1)
         q_target = rewards_flat + (1. - terms_flat) * self.discount * target_v_values
         qf_loss = torch.mean((q1_pred - q_target) ** 2) + torch.mean((q2_pred - q_target) ** 2)
         qf_loss.backward()
@@ -522,7 +531,7 @@ class ExpSoftActorCritic(MetaExpAlgorithm):
 
         # compute min Q on the new actions
         new_actions = new_actions.view(t * b, -1)
-        min_q_new_actions = self._min_q(obs, new_actions)
+        min_q_new_actions = self._min_q(obs, new_actions,encoder_output)
 
         # vf update
         #print(min_q_new_actions)

@@ -13,7 +13,7 @@ from rlkit.torch.core import PyTorchModule
 from rlkit.torch.data_management.normalizer import TorchFixedNormalizer
 from rlkit.torch.modules import LayerNorm
 import math
-
+import torch.nn.functional as F
 def identity(x):
     return x
 
@@ -260,6 +260,7 @@ class SnailEncoder(FlattenMlp):
         self.TC2 = TCBlock(self.hidden_dim+16*layer_count+32,512,16)
         self.atten2 = AttentionBlock(self.hidden_dim+16*layer_count*2+32,32,32)
         self.out_layer = nn.Linear(self.hidden_dim+16*layer_count*2+32+32,self.output_size)
+        self.var_start = int(self.output_size / 2)
 
     def forward(self, in_, return_preactivations=False):
         # expects inputs of dimension (task, seq, feat)
@@ -283,6 +284,38 @@ class SnailEncoder(FlattenMlp):
         # output layer
         preactivation = self.out_layer(out)
         output = self.output_activation(preactivation)
+
+        output[:,self.var_start:] = F.softplus(output[:,self.var_start:])
+        if return_preactivations:
+            return output, preactivation
+        else:
+            return output
+
+    def forward_seq(self, in_, return_preactivations=False):
+        # expects inputs of dimension (task, seq, feat)
+        task, seq, feat = in_.size()
+        out = in_.view(task * seq, feat)
+
+        # embed with MLP
+        for i, fc in enumerate(self.fcs):
+            out = fc(out)
+            out = self.hidden_activation(out)
+
+        out = out.view(task, seq, -1)
+        out = out.permute(0,2,1)
+        #print(out.shape)
+        out = self.TC1(out)
+        out = self.atten1(out)
+        out = self.TC2(out)
+        out = self.atten2(out)
+        out = out.permute(0,2,1)
+        out = out.view(task * seq,-1)
+
+
+        preactivation = self.out_layer(out)
+        output = self.output_activation(preactivation)
+        output[..., self.var_start:] = F.softplus(output[..., self.var_start:])
+        output = output.view(task,seq,-1)
         if return_preactivations:
             return output, preactivation
         else:
