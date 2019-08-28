@@ -284,8 +284,8 @@ class SnailEncoder(FlattenMlp):
         # output layer
         preactivation = self.out_layer(out)
         output = self.output_activation(preactivation)
-
-        output[:,self.var_start:] = F.softplus(output[:,self.var_start:])
+        temp = F.softplus(output[..., self.var_start:])
+        #output[..., self.var_start:] = temp
         if return_preactivations:
             return output, preactivation
         else:
@@ -314,7 +314,8 @@ class SnailEncoder(FlattenMlp):
 
         preactivation = self.out_layer(out)
         output = self.output_activation(preactivation)
-        output[..., self.var_start:] = F.softplus(output[..., self.var_start:])
+        temp = F.softplus(output[..., self.var_start:])
+        #output[..., self.var_start:] = temp
         output = output.view(task,seq,-1)
         if return_preactivations:
             return output, preactivation
