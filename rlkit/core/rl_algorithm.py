@@ -855,8 +855,8 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
                 for idx in self.train_tasks:
                     self.task_idx = idx
                     self.env.reset_task(idx)
-                    #for _ in range(self.num_trajs):
-                    #    self.collect_data_exp(self.meta_episode_len)
+                    for _ in range(self.num_trajs):
+                        self.collect_data_exp(self.meta_episode_len)
                     self.collect_data(self.num_initial_steps, 1, np.inf,add_to_enc_buffer=True)
             # Sample data from train tasks.
             for i in range(self.num_tasks_sample):

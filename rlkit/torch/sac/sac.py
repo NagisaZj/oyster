@@ -357,6 +357,8 @@ class ExpSAC(ExpAlgorithm):
             soft_target_tau=1e-2,
             plotter=None,
             render_eval_paths=False,
+            use_info_in_context=False,
+            entropy_weight=1e-2,
             **kwargs
     ):
         super().__init__(
@@ -368,7 +370,7 @@ class ExpSAC(ExpAlgorithm):
             encoder=encoder,
             **kwargs
         )
-
+        self.entropy_weight = entropy_weight
         self.soft_target_tau = soft_target_tau
         self.policy_mean_reg_weight = policy_mean_reg_weight
         self.policy_std_reg_weight = policy_std_reg_weight
@@ -535,7 +537,7 @@ class ExpSAC(ExpAlgorithm):
 
         # data is (task, batch, feat)
         obs, actions, rewards, next_obs, terms = self.sample_sac(indices)
-
+        rewards_traj = rewards
         # run inference in networks
         policy_outputs, task_z = self.agent(obs, context)
         new_actions, policy_mean, policy_log_std, log_pi = policy_outputs[:4]
@@ -609,7 +611,13 @@ class ExpSAC(ExpAlgorithm):
         self.policy_optimizer.step()
 
         obs, actions, rewards, next_obs, terms = context_unbatched
-        policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew = self.exploration_agent(obs, context)
+        policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew_entropy = self.exploration_agent(obs, context)
+
+        path_rew = torch.sum(rewards_traj,keepdim=True,dim=1)
+        path_rew = torch.Tensor.repeat(path_rew,1,rewards_traj.shape[1],1)
+        rew_entropy = torch.unsqueeze(rew_entropy,2)
+        #print(rew_entropy.shape,path_rew.shape)
+        rew = rew_entropy*self.entropy_weight + path_rew
         z_mean, z_var, z_mean_next, z_var_next = z_mean.contiguous(),z_var.contiguous(),z_mean_next.contiguous(),z_var_next.contiguous()
         new_actions, policy_mean, policy_log_std, log_pi = policy_outputs[:4]
         #encoder_output = encoder_output.detach()
