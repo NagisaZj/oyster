@@ -48,7 +48,8 @@ default_config = dict(
         num_skills = 1, # number of skills used by SMM, unused for now
         seed_sample = False,
         attention = False,
-        snail=False
+        snail=False,
+        use_info_in_context=False
     ),
     util_params=dict(
         base_log_dir='output1',
@@ -71,16 +72,24 @@ default_config_exp = dict(
         randomize_tasks=True, # shuffle the tasks after creating them
     ),
     algo_params=dict(
-        num_tasks_sample=80, # number of randomly sampled tasks to collect data for each iteration
-        num_train_steps_per_itr=2000, # number of meta-gradient steps taken per iteration
-        num_evals=2, # number of independent evals
+        meta_batch=16,  # number of tasks to average the gradient across
+        num_iterations=500,  # number of data sampling / training iterates
+        num_initial_steps=2000,  # number of transitions collected per task before training
+        num_tasks_sample=5,  # number of randomly sampled tasks to collect data for each iteration
+        num_steps_prior=400,  # number of transitions to collect per task with z ~ prior
+        num_steps_posterior=0,  # number of transitions to collect per task with z ~ posterior
+        num_extra_rl_steps_posterior=400,
+        # number of additional transitions to collect per task with z ~ posterior that are only used to train the policy and NOT the encoder
+        num_train_steps_per_itr=2000,  # number of meta-gradient steps taken per iteration
+        num_evals=2,  # number of independent evals
         num_steps_per_eval=600,  # nuumber of transitions to eval on
-        batch_size=256, # number of transitions in the RL batch
-        max_path_length=50, # max path length for this environment
-        discount=0.99, # RL discount factor
-        embedding_batch_size=128, # number of transitions in the context batch
-        embedding_mini_batch_size=128,
-        soft_target_tau=0.005, # for SAC target network update
+        batch_size=256,  # number of transitions in the RL batch
+        embedding_batch_size=256,  # number of transitions in the context batch
+        embedding_mini_batch_size=256,
+        # number of context transitions to backprop through (should equal the arg above except in the recurrent encoder case)
+        max_path_length=200,  # max path length for this environment
+        discount=0.99,  # RL discount factor
+        soft_target_tau=0.005,  # for SAC target network update
         policy_lr=3E-4,
         qf_lr=3E-4,
         vf_lr=3E-4,

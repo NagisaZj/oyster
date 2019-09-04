@@ -1,6 +1,6 @@
 import numpy as np
 
-from rlkit.samplers.util import rollout,SMMrollout,seedrollout, exprollout
+from rlkit.samplers.util import rollout,SMMrollout,seedrollout, exprollout, exprollout_split
 from rlkit.torch.sac.policies import MakeDeterministic
 
 
@@ -74,7 +74,7 @@ class ExpInPlacePathSampler(object):
     def shutdown_worker(self):
         pass
 
-    def obtain_samples(self, deterministic=False, max_samples=np.inf, max_trajs=np.inf, accum_context=True, resample=1):
+    def obtain_samples(self, deterministic=False, max_samples=np.inf, max_trajs=np.inf, accum_context_for_agent=False, resample=1, context_agent = None,split=False):
         """
         Obtains samples in the environment until either we reach either max_samples transitions or
         num_traj trajectories.
@@ -85,16 +85,22 @@ class ExpInPlacePathSampler(object):
         paths = []
         n_steps_total = 0
         n_trajs = 0
+        if not split:
+            path = exprollout(
+            self.env, policy, max_path_length=self.max_path_length, max_trajs=max_trajs, accum_context_for_agent=accum_context_for_agent, context_agent = context_agent)
+            paths.append(path)
+            n_steps_total += len(path['observations'])
+            n_trajs += 1
 
-        path = exprollout(
-            self.env, policy, max_path_length=self.max_path_length, max_trajs=max_trajs)
-        # save the latent context that generated this trajectory
-        # path['context'] = policy.z.detach().cpu().numpy()
-        paths.append(path)
-        n_steps_total += len(path['observations'])
-        n_trajs += 1
+            return paths, n_steps_total
+        else:
+            path = exprollout_split(
+                self.env, policy, max_path_length=self.max_path_length, max_trajs=max_trajs,
+                accum_context_for_agent=accum_context_for_agent, context_agent=context_agent)
+            n_steps_total += self.max_path_length * max_trajs
+            n_trajs += max_trajs
 
-        return paths, n_steps_total
+            return path, n_steps_total
 
 class SeedInPlacePathSampler(object):
     """

@@ -10,8 +10,8 @@ import json
 import torch
 
 from rlkit.envs import ENVS
-from rlkit.envs.wrappers import NormalizedBoxEnv
-from rlkit.torch.sac.policies import TanhGaussianPolicy, PEARLTanhGaussianPolicy
+from rlkit.envs.wrappers import NormalizedBoxEnv, ProxyEnv
+from rlkit.torch.sac.policies import TanhGaussianPolicy, PEARLTanhGaussianPolicy, DiscretePEARLTanhGaussianPolicy
 from rlkit.torch.networks import FlattenMlp, MlpEncoder, RecurrentEncoder, AttentionEncoder, SnailEncoder
 from rlkit.torch.sac.sac import PEARLSoftActorCritic
 from rlkit.torch.sac.agent import PEARLAgent
@@ -23,29 +23,41 @@ from configs.default import default_config
 def experiment(variant):
 
     # create multi-task environment and sample tasks
-    env = NormalizedBoxEnv(ENVS[variant['env_name']](**variant['env_params']))
+    if variant['env_name']!='goat-car':
+        env = NormalizedBoxEnv(ENVS[variant['env_name']](**variant['env_params']))
+        policy_model = PEARLTanhGaussianPolicy
+        action_dim = int(np.prod(env.action_space.shape))
+    else:
+        env = ENVS[variant['env_name']](**variant['env_params'])
+        policy_model = DiscretePEARLTanhGaussianPolicy
+        action_dim =  env.action_space.n
+        info_dim = int(np.prod(env.info_space.shape))
     tasks = env.get_all_task_idx()
     obs_dim = int(np.prod(env.observation_space.shape))
-    action_dim = int(np.prod(env.action_space.shape))
+
     reward_dim = 1
 
     # instantiate networks
     latent_dim = variant['latent_size']
     context_encoder_input_dim = 2 * obs_dim + action_dim + reward_dim if variant['algo_params'][
         'use_next_obs_in_context'] else obs_dim + action_dim + reward_dim
+    if variant ['algo_params']['use_info_in_context']:
+        context_encoder_input_dim = context_encoder_input_dim + info_dim
     context_encoder_output_dim = latent_dim * 2 if variant['algo_params']['use_information_bottleneck'] else latent_dim
 
     net_size = variant['net_size']
     recurrent = variant['algo_params']['recurrent']
     encoder_model = RecurrentEncoder if recurrent else MlpEncoder
+    hidden_sizes=[200,200,200]
     if recurrent and variant['algo_params']['attention']:
         encoder_model = AttentionEncoder
 
-    if recurrent and variant['algo_params']['snail']:
+    if  variant['algo_params']['snail']:
         encoder_model = SnailEncoder
+        hidden_sizes=[20]
 
     context_encoder = encoder_model(
-        hidden_sizes=[200, 200, 200],
+        hidden_sizes=hidden_sizes,
         input_size=context_encoder_input_dim,
         output_size=context_encoder_output_dim,
     )
@@ -64,7 +76,7 @@ def experiment(variant):
         input_size=obs_dim + latent_dim,
         output_size=1,
     )
-    policy = PEARLTanhGaussianPolicy(
+    policy = policy_model(
         hidden_sizes=[net_size, net_size, net_size],
         obs_dim=obs_dim + latent_dim,
         latent_dim=latent_dim,

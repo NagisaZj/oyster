@@ -177,3 +177,57 @@ class goal_pitfall_env(PointEnv):
             pitfall_rew = pitfall_rew - 20
         reward = reward + pitfall_rew
         return ob, reward, done, d
+
+
+@register_env('goat-car')
+class GoatCarEnv(Env):
+    def __init__(self, randomize_tasks=False, n_tasks=2):
+
+        if randomize_tasks:
+            np.random.seed(1337)
+            goals = np.random.choice(3,n_tasks).tolist()
+        goals = np.ones((n_tasks),).tolist()
+        self.goals = goals
+
+        self.reset_task(0)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(1,))
+        self.action_space = spaces.Discrete(4)
+        self.info_space = spaces.Discrete(4)
+
+    def reset_task(self, idx):
+        ''' reset goal AND reset the agent '''
+        self._goal = self.goals[idx]
+        self.reset()
+
+    def get_all_task_idx(self):
+        return range(len(self.goals))
+
+    def reset_model(self):
+        # reset to a random location on the unit square
+        self._state = np.ones((1,))
+        return self._get_obs()
+
+    def reset(self):
+        return self.reset_model()
+
+    def _get_obs(self):
+        return np.copy(self._state)
+
+    def step(self, action):
+        #print(action)
+        action = np.argmax(action)
+        if action == 3:
+            return self._state, 0,False,dict(info=self._goal)
+        else:
+            reward = 1 if action == self._goal else -1
+            #if reward==1:
+            #    print("!")
+            return self._state, reward, False,dict(info=-1)
+
+    def viewer_setup(self):
+        print('no viewer')
+        pass
+
+    def render(self):
+        print('current state:', self._state)
+

@@ -2,12 +2,12 @@
     "env_name": "sparse-point-robot",
     "n_train_tasks": 80,
     "n_eval_tasks": 20,
-    "path_to_weights": "./outputa/sparse-point-robot/2019_08_25_19_19_52",
     "env_params": {
         "n_tasks": 100
     }
     ,
     "algo_params": {
+        "num_iterations": 500,
         "num_initial_steps": 200,
         "num_tasks_sample": 10,
         "num_steps_prior": 100,
@@ -15,8 +15,8 @@
         "num_extra_rl_steps_posterior": 0,
         "num_train_steps_per_itr": 1000,
         "num_steps_per_eval": 1000,
-        "embedding_batch_size": 128,
-        "embedding_mini_batch_size": 128,
+        "embedding_batch_size": 256,
+        "embedding_mini_batch_size": 256,
         "max_path_length": 50,
         "discount": 0.90,
         "reward_scale": 100.0,
@@ -25,9 +25,8 @@
         "num_exp_traj_eval": 5,
         "dump_eval_paths":1,
         "seed_sample": 1,
-        "recurrent": 1,
         "snail": 1,
-        "meta_episode_len": 3,
+        "meta_episode_len": 5,
         "num_trajs" : 5,
         "num_trajs_eval" : 5
     },

@@ -241,7 +241,7 @@ def SMMrollout(env, agent, max_path_length=np.inf, animated=False):
         env_infos=env_infos,
     )
 
-def exprollout(env, agent, max_path_length,  max_trajs):
+def exprollout(env, agent, max_path_length,  max_trajs, accum_context_for_agent=False, context_agent = None):
     """
     The following value for the following keys will be a 2D array, with the
     first dimension corresponding to the time dimension.
@@ -281,11 +281,16 @@ def exprollout(env, agent, max_path_length,  max_trajs):
             a, agent_info = agent.get_action(o)
             #print(a)
             next_o, r, d, env_info = env.step(a)
-            r = env_info['sparse_reward']
+
+            if accum_context_for_agent:
+                context_agent.update_context([o, a, r, next_o, d, env_info])
+
+            #r = env_info['sparse_reward']
             # update the agent's current context
 
             agent.update_context([o,a,r,next_o,d,env_info])
-            r = agent.infer_reward()
+            agent.infer_posterior(agent.context)
+            #r = agent.infer_reward()
 
             observations.append(o)
             rewards.append(r)
@@ -326,6 +331,100 @@ def exprollout(env, agent, max_path_length,  max_trajs):
         z_means=z_means,
         z_vars=z_vars
     )
+
+def exprollout_split(env, agent, max_path_length,  max_trajs, accum_context_for_agent=False, context_agent = None):
+    """
+    The following value for the following keys will be a 2D array, with the
+    first dimension corresponding to the time dimension.
+     - observations
+     - actions
+     - rewards
+     - next_observations
+     - terminals
+
+    The next two elements will be lists of dictionaries, with the index into
+    the list being the index into the time
+     - agent_infos
+     - env_infos
+
+    :param env:
+    :param agent:
+    :param max_path_length:
+    :param animated:
+    :param accum_context: if True, accumulate the collected context
+    :return:
+    """
+    paths = []
+    num_trajs = 0
+    agent.clear_z()
+    while num_trajs<max_trajs:
+        o = env.reset()
+        next_o = None
+        path_length = 0
+        observations = []
+        actions = []
+        rewards = []
+        terminals = []
+        agent_infos = []
+        env_infos = []
+        z_means = []
+        z_vars = []
+        while path_length < max_path_length:
+            a, agent_info = agent.get_action(o)
+            #print(a)
+            next_o, r, d, env_info = env.step(a)
+
+            if accum_context_for_agent:
+                context_agent.update_context([o, a, r, next_o, d, env_info])
+
+            #r = env_info['sparse_reward']
+            # update the agent's current context
+
+            agent.update_context([o,a,r,next_o,d,env_info])
+            agent.infer_posterior(agent.context)
+            #r = agent.infer_reward()
+
+            observations.append(o)
+            rewards.append(r)
+            terminals.append(d)
+            actions.append(a)
+            agent_infos.append(agent_info)
+            env_infos.append(env_info)
+            # z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
+            # z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+            path_length += 1
+            if d:
+                break
+            o = next_o
+
+        num_trajs+=1
+
+        actions = np.array(actions)
+        if len(actions.shape) == 1:
+            actions = np.expand_dims(actions, 1)
+        observations = np.array(observations)
+        if len(observations.shape) == 1:
+            observations = np.expand_dims(observations, 1)
+            next_o = np.array([next_o])
+        next_observations = np.vstack(
+            (
+                observations[1:, :],
+                np.expand_dims(next_o, 0)
+            )
+        )
+        paths.append( dict(
+            observations=observations,
+            actions=actions,
+            rewards=np.array(rewards).reshape(-1, 1),
+            next_observations=next_observations,
+            terminals=np.array(terminals).reshape(-1, 1),
+            agent_infos=agent_infos,
+            env_infos=env_infos,
+            z_means=z_means,
+            z_vars=z_vars
+        ))
+
+        return paths
 
 def split_paths(paths):
     """

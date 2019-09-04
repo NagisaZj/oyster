@@ -41,7 +41,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             reward_scale=1,
             num_exp_traj_eval=1,
             update_post_train=1,
-            eval_deterministic=True,
+            eval_deterministic=False,
             render=False,
             save_replay_buffer=False,
             save_algorithm=False,
@@ -335,6 +335,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                                                                 accum_context=False,
                                                                 resample=resample_z_rate)
             num_transitions += n_samples
+            #for p in paths:
+            #    print(p['actions'],p['rewards'])
             if add_to_policy_buffer:
                 self.replay_buffer.add_paths(self.task_idx, paths)
             if add_to_enc_buffer:
@@ -611,7 +613,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                                                         max_trajs=1,
                                                         resample=np.inf)
                 paths += p
-
+            #for p in paths:
+            #    print(p['actions'],p['rewards'])
             if self.sparse_rewards:
                 for p in paths:
                     sparse_rewards = np.stack(e['sparse_reward'] for e in p['env_infos']).reshape(-1, 1)
@@ -678,6 +681,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
             self,
             env,
             agent,
+            agent_exp,
             train_tasks,
             eval_tasks,
             encoder,
@@ -729,7 +733,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         """
         self.env = env
         self.agent = agent
-        self.exploration_agent = agent # Can potentially use a different policy purely for exploration rather than also solving tasks, currently not being used
+        self.exploration_agent = agent_exp # Can potentially use a different policy purely for exploration rather than also solving tasks, currently not being used
         self.context_encoder = encoder
         self.train_tasks = train_tasks
         self.eval_tasks = eval_tasks
@@ -772,9 +776,15 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         self.num_trajs = num_trajs
         self.num_trajs_eval = num_trajs_eval
 
-        self.sampler = ExpInPlacePathSampler(
+        self.sampler = InPlacePathSampler(
             env=env,
             policy=agent,
+            max_path_length=self.max_path_length,
+        )
+
+        self.expsampler = ExpInPlacePathSampler(
+            env=env,
+            policy=self.exploration_agent,
             encoder=self.context_encoder,
             max_path_length=self.max_path_length,
         )
@@ -789,7 +799,11 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
                 self.train_tasks,
             )
 
-
+        self.enc_replay_buffer = MultiTaskReplayBuffer(
+            self.replay_buffer_size,
+            env,
+            self.train_tasks,
+        )
 
         self._n_env_steps_total = 0
         self._n_train_steps_total = 0
@@ -841,16 +855,26 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
                 for idx in self.train_tasks:
                     self.task_idx = idx
                     self.env.reset_task(idx)
-                    for _ in range(self.num_trajs):
-                        self.collect_data(self.meta_episode_len)
+                    #for _ in range(self.num_trajs):
+                    #    self.collect_data_exp(self.meta_episode_len)
+                    self.collect_data(self.num_initial_steps, 1, np.inf,add_to_enc_buffer=True)
             # Sample data from train tasks.
             for i in range(self.num_tasks_sample):
                 idx = np.random.randint(len(self.train_tasks))
                 self.task_idx = idx
                 self.env.reset_task(idx)
+                if (it_+1)%5==0:
+                    self.enc_replay_buffer.task_buffers[idx].clear()
                 for _ in range(self.num_trajs):
-                    self.collect_data(self.meta_episode_len)
-
+                    self.collect_data_exp(self.meta_episode_len)
+                if self.num_steps_prior > 0:
+                    self.collect_data(self.num_steps_prior, 1, np.inf,add_to_enc_buffer=True)
+                    # collect some trajectories with z ~ posterior
+                if self.num_steps_posterior > 0:
+                    self.collect_data(self.num_steps_posterior, 1, self.update_post_train,add_to_enc_buffer=True)
+                    # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
+                if self.num_extra_rl_steps_posterior > 0:
+                    self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,)
             print('collect over')
 
             # Sample train tasks and compute gradient updates on parameters.
@@ -874,10 +898,36 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         """
         pass
 
+    def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=False):
+        '''
+        get trajectories from current env in batch mode with given policy
+        collect complete trajectories until the number of collected transitions >= num_samples
+        :param agent: policy to rollout
+        :param num_samples: total number of transitions to sample
+        :param resample_z_rate: how often to resample latent context z (in units of trajectories)
+        :param update_posterior_rate: how often to update q(z | c) from which z is sampled (in units of trajectories)
+        :param add_to_enc_buffer: whether to add collected data to encoder replay buffer
+        '''
+        # start from the prior
+        self.agent.clear_z()
 
+        num_transitions = 0
+        while num_transitions < num_samples:
+            paths, n_samples = self.sampler.obtain_samples(max_samples=num_samples - num_transitions,
+                                                           max_trajs=update_posterior_rate,
+                                                           accum_context=False,
+                                                           resample=resample_z_rate)
+            num_transitions += n_samples
+            self.replay_buffer.add_paths(self.task_idx, paths)
+            if add_to_enc_buffer:
+                self.enc_replay_buffer.add_paths(self.task_idx, paths)
+            if update_posterior_rate != np.inf:
+                context, context_unbatched = self.sample_context(self.task_idx)
+                self.agent.infer_posterior(context)
+        self._n_env_steps_total += num_transitions
+        gt.stamp('sample')
 
-
-    def collect_data(self, num_episodes):
+    def collect_data_exp(self, num_episodes):
         '''
         get trajectories from current env in batch mode with given policy
         collect complete trajectories until the number of collected transitions >= num_samples
@@ -891,10 +941,10 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         # start from the prior
 
 
-        paths, n_samples = self.sampler.obtain_samples(max_trajs=num_episodes)
+        paths, n_samples = self.expsampler.obtain_samples(max_trajs=num_episodes)
 
 
-        self.replay_buffer.add_paths(self.task_idx, paths)
+        self.enc_replay_buffer.add_paths(self.task_idx, paths)
 
         self._n_env_steps_total += n_samples
         gt.stamp('sample')
@@ -1018,34 +1068,37 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
             data_to_save['algorithm'] = self
         return data_to_save
 
-    def collect_paths(self, idx, epoch, run,num_trajs):
+    def collect_paths(self, idx, epoch, run):
         self.task_idx = idx
         self.env.reset_task(idx)
 
-        #self.agent.clear_z()
+        self.agent.clear_z()
         paths = []
         num_transitions = 0
-        for _ in range(self.num_trajs_eval):
-            path, num = self.sampler.obtain_samples(
-                                                max_trajs=self.meta_episode_len)
+        num_trajs = 0
+
+        path, num = self.expsampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                   max_trajs=self.num_exp_traj_eval, accum_context_for_agent=True, context_agent = self.agent,split=True)
+        num_transitions += num
+        num_trajs +=self.num_exp_traj_eval
+        paths+=path
+
+        while num_transitions < self.num_steps_per_eval:
+
+            path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.num_steps_per_eval - num_transitions, max_trajs=1, accum_context=False)
             paths += path
             num_transitions += num
+            num_trajs += 1
+            self.agent.infer_posterior(self.agent.context)
 
-            #if num_trajs >= self.num_exp_traj_eval:
-            #    self.agent.infer_posterior(self.agent.context)
-
-        #if self.sparse_rewards:
-        #    for p in paths:
-        #        sparse_rewards = np.stack(e['sparse_reward'] for e in p['env_infos']).reshape(-1, 1)
-        #        p['rewards'] = sparse_rewards
+        if self.sparse_rewards:
+            for p in paths:
+                sparse_rewards = np.stack(e['sparse_reward'] for e in p['env_infos']).reshape(-1, 1)
+                p['rewards'] = sparse_rewards
 
         goal = self.env._goal
         for path in paths:
             path['goal'] = goal # goal
-        if hasattr(self.env,"_pitfall"):
-            pitfall = self.env._pitfall
-            for path in paths:
-                path['pitfall'] = pitfall
 
         # save the paths for visualization, only useful for point mass
         if self.dump_eval_paths:
@@ -1059,7 +1112,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         for idx in indices:
             all_rets = []
             for r in range(self.num_evals):
-                paths = self.collect_paths(idx, epoch, r,self.num_trajs)
+                paths = self.collect_paths(idx, epoch, r)
                 all_rets.append([eval_util.get_average_returns([p]) for p in paths])
             final_returns.append(np.mean([np.mean(a) for a in all_rets]))
             # record online returns for the first n trajectories
@@ -1079,9 +1132,12 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         if self.dump_eval_paths:
             # 100 arbitrarily chosen for visualizations of point_robot trajectories
             # just want stochasticity of z, not the policy
-            #self.agent.clear_z()
+            self.agent.clear_z()
             #if not self.use_SMM:
-            prior_paths, _ = self.sampler.obtain_samples(max_trajs=self.meta_episode_len)
+            prior_paths, _ = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                         max_samples=self.max_path_length * 20,
+                                                         accum_context=False,
+                                                         resample=1)
             #else:
             #    prior_paths, _ = self.smm_sampler.obtain_samples(
             #                                                 max_samples=self.max_path_length * 20,
@@ -1098,14 +1154,20 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
             self.task_idx = idx
             self.env.reset_task(idx)
             paths = []
-            for _ in range(self.num_trajs_eval):
-                p, _ = self.sampler.obtain_samples(max_trajs=self.meta_episode_len)
+            for _ in range(self.num_steps_per_eval // self.max_path_length):
+                context, context_unbatched = self.sample_context(idx)
+                self.agent.infer_posterior(context)
+                p, _ = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+                                                   max_samples=self.max_path_length,
+                                                   accum_context=False,
+                                                   max_trajs=1,
+                                                   resample=np.inf)
                 paths += p
 
-            #if self.sparse_rewards:
-            #    for p in paths:
-            #        sparse_rewards = np.stack(e['sparse_reward'] for e in p['env_infos']).reshape(-1, 1)
-            #        p['rewards'] = sparse_rewards
+            if self.sparse_rewards:
+                for p in paths:
+                    sparse_rewards = np.stack(e['sparse_reward'] for e in p['env_infos']).reshape(-1, 1)
+                    p['rewards'] = sparse_rewards
 
             train_returns.append(eval_util.get_average_returns(paths))
         train_returns = np.mean(train_returns)
@@ -1121,10 +1183,10 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         eval_util.dprint(test_online_returns)
 
         # save the final posterior
-        #self.agent.log_diagnostics(self.eval_statistics)
+        self.agent.log_diagnostics(self.eval_statistics)
 
-        #if hasattr(self.env, "log_diagnostics"):
-        #    self.env.log_diagnostics(paths, prefix=None)
+        if hasattr(self.env, "log_diagnostics"):
+            self.env.log_diagnostics(paths, prefix=None)
 
         avg_train_return = np.mean(train_final_returns)
         avg_test_return = np.mean(test_final_returns)

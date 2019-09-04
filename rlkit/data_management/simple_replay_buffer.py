@@ -5,7 +5,7 @@ from rlkit.data_management.replay_buffer import ReplayBuffer
 
 class SimpleReplayBuffer(ReplayBuffer):
     def __init__(
-            self, max_replay_buffer_size, observation_dim, action_dim,
+            self, max_replay_buffer_size, observation_dim, action_dim,info_dim=1
     ):
         self._observation_dim = observation_dim
         self._action_dim = action_dim
@@ -22,6 +22,7 @@ class SimpleReplayBuffer(ReplayBuffer):
         self._sparse_rewards = np.zeros((max_replay_buffer_size, 1))
         # self._terminals[i] = a terminal was received at time i
         self._terminals = np.zeros((max_replay_buffer_size, 1), dtype='uint8')
+        self._env_infos = np.zeros((max_replay_buffer_size, info_dim))
         self.clear()
 
     def add_sample(self, observation, action, reward, terminal,
@@ -32,6 +33,7 @@ class SimpleReplayBuffer(ReplayBuffer):
         self._terminals[self._top] = terminal
         self._next_obs[self._top] = next_observation
         self._sparse_rewards[self._top] = kwargs['env_info'].get('sparse_reward', 0)
+        self._env_infos[self._top] = kwargs['env_info'].get('info', 0)
         self._advance()
 
     def terminate_episode(self):
@@ -62,6 +64,7 @@ class SimpleReplayBuffer(ReplayBuffer):
             terminals=self._terminals[indices],
             next_observations=self._next_obs[indices],
             sparse_rewards=self._sparse_rewards[indices],
+            env_infos = self._env_infos[indices],
         )
 
     def random_batch(self, batch_size):

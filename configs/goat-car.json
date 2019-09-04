@@ -1,0 +1,35 @@
+{
+    "env_name": "goat-car",
+    "net_size": 10,
+    "latent_size": 2,
+    "n_train_tasks": 10,
+    "n_eval_tasks": 10,
+    "env_params": {
+        "n_tasks": 20
+    }
+    ,
+    "algo_params": {
+        "num_initial_steps": 20,
+        "num_tasks_sample": 10,
+        "num_steps_prior": 30,
+        "num_steps_posterior": 300,
+        "num_extra_rl_steps_posterior": 0,
+        "num_train_steps_per_itr": 100,
+        "num_steps_per_eval": 100,
+        "embedding_batch_size": 256,
+        "embedding_mini_batch_size": 256,
+        "max_path_length": 10,
+        "discount": 0.90,
+        "reward_scale": 100,
+        "kl_lambda": 0.5,
+        "dump_eval_paths":1,
+        "num_exp_traj_eval": 5,
+        "policy_mean_reg_weight": 0,
+        "policy_std_reg_weight": 0,
+        "use_info_in_context": 1
+    },
+    "util_params":
+    {
+        "difficulty": 1
+    }
+}

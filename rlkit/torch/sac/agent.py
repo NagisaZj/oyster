@@ -58,7 +58,7 @@ class PEARLAgent(nn.Module):
         self.use_ib = kwargs['use_information_bottleneck']
         self.sparse_rewards = kwargs['sparse_rewards']
         self.use_next_obs_in_context = kwargs['use_next_obs_in_context']
-
+        self.use_info_in_context = kwargs['use_info_in_context']
         # initialize buffers for z dist and z
         # use buffers so latent context can be saved along with model weights
         self.register_buffer('z', torch.zeros(1, latent_dim))
@@ -99,6 +99,7 @@ class PEARLAgent(nn.Module):
         o, a, r, no, d, info = inputs
         if self.sparse_rewards:
             r = info['sparse_reward']
+
         o = ptu.from_numpy(o[None, None, ...])
         a = ptu.from_numpy(a[None, None, ...])
         r = ptu.from_numpy(np.array([r])[None, None, ...])
@@ -108,6 +109,10 @@ class PEARLAgent(nn.Module):
             data = torch.cat([o, a, r, no], dim=2)
         else:
             data = torch.cat([o, a, r], dim=2)
+        if self.use_info_in_context:
+            i=info['info']
+            i = ptu.from_numpy(np.array([i])[None, None, ...])
+            data=torch.cat([data,i],dim=2)
         if self.context is None:
             self.context = data
         else:
@@ -228,6 +233,7 @@ class ExpAgent(nn.Module):
         self.use_ib = kwargs['use_information_bottleneck']
         self.sparse_rewards = kwargs['sparse_rewards']
         self.use_next_obs_in_context = kwargs['use_next_obs_in_context']
+        self.snail = kwargs['snail']
 
         # initialize buffers for z dist and z
         # use buffers so latent context can be saved along with model weights
@@ -293,11 +299,15 @@ class ExpAgent(nn.Module):
         kl_div_sum = torch.sum(torch.stack(kl_divs))
         return kl_div_sum
 
-    def infer_posterior(self, context):
+    def infer_posterior(self, context):#TODO: mean! var!
         ''' compute q(z|c) as a function of input context and sample new z from it'''
         params = self.context_encoder(context)
+        #print(self.context_encoder)
+        #print('m',params.shape)
         params = params.view(context.size(0), -1, self.context_encoder.output_size)
-        # with probabilistic z, predict mean and variance of q(z | c)
+        #print(context.shape)
+        #print(params.shape)
+        ## with probabilistic z, predict mean and variance of q(z | c)
         if self.use_ib:
             mu = params[..., :self.latent_dim]
             sigma_squared =params[..., self.latent_dim:]
@@ -329,14 +339,22 @@ class ExpAgent(nn.Module):
     def forward(self, obs, context):
         ''' given context, get statistics under the current policy of a set of observations '''
         t, b, _ = obs.size()
-        encoder_output = self.context_encoder.forward_seq(context)
-        in_ = torch.cat([obs, encoder_output.detach()], dim=2)
+        encoder_output_next = self.context_encoder.forward_seq(context)
+        z_mean_next = encoder_output_next[:,:,:self.latent_dim].detach()
+        z_var_next = F.softplus(encoder_output_next[:, :, self.latent_dim:]).detach()
+        var = ptu.ones(context.shape[0], 1,self.latent_dim)
+        mean = ptu.ones(context.shape[0], 1,self.latent_dim)
+        z_mean = torch.cat([mean,z_mean_next],dim=1)[:,:-1,:].detach()
+        z_var = torch.cat([var,z_var_next],dim=1)[:,:-1,:].detach()
+        in_ = torch.cat([obs, z_mean,z_var], dim=2)
         in_=in_.view(t * b, -1)
-        #encoder_output = encoder_output.view(t * b, -1)
+
 
         policy_outputs = self.policy(in_, reparameterize=True, return_log_prob=True)
 
-        return policy_outputs, encoder_output
+        rew = torch.mean(torch.log(z_var),dim=2) - torch.mean(torch.log(z_var_next),dim=2)
+
+        return policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew
 
     def log_diagnostics(self, eval_statistics):
         '''
@@ -347,12 +365,7 @@ class ExpAgent(nn.Module):
         eval_statistics['Z mean eval'] = z_mean
         eval_statistics['Z variance eval'] = z_sig
 
-    def infer_reward(self):
-        self.infer_posterior(self.context)
-        reward = self.entropy_prev - torch.mean(torch.log(self.z_vars))
-        self.entropy_prev = torch.mean(torch.log(self.z_vars))
-        reward = reward.cpu().data.numpy()
-        return reward
+
 
     @property
     def networks(self):

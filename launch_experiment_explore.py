@@ -38,17 +38,45 @@ def experiment(variant):
     net_size = variant['net_size']
     recurrent = variant['algo_params']['recurrent']
     encoder_model = RecurrentEncoder if recurrent else MlpEncoder
-    if recurrent and variant['algo_params']['snail']:
+    hidden_sizes = [200, 200, 200]
+    if  variant['algo_params']['snail']:
         encoder_model = SnailEncoder
+        hidden_sizes = [20]
 
     context_encoder = encoder_model(
-        hidden_sizes=[200, 200, 200],
+        hidden_sizes=hidden_sizes,
         input_size=context_encoder_input_dim,
         output_size=context_encoder_output_dim,
     )
     context_encoder.use_next_obs_in_context = variant['algo_params'][
         'use_next_obs_in_context']
-
+    qf1 = FlattenMlp(
+        hidden_sizes=[net_size, net_size, net_size],
+        input_size=obs_dim + action_dim + latent_dim,
+        output_size=1,
+    )
+    qf2 = FlattenMlp(
+        hidden_sizes=[net_size, net_size, net_size],
+        input_size=obs_dim + action_dim + latent_dim,
+        output_size=1,
+    )
+    vf = FlattenMlp(
+        hidden_sizes=[net_size, net_size, net_size],
+        input_size=obs_dim + latent_dim,
+        output_size=1,
+    )
+    policy = PEARLTanhGaussianPolicy(
+        hidden_sizes=[net_size, net_size, net_size],
+        obs_dim=obs_dim + latent_dim,
+        latent_dim=latent_dim,
+        action_dim=action_dim,
+    )
+    agent = PEARLAgent(
+        latent_dim,
+        context_encoder,
+        policy,
+        **variant['algo_params']
+    )
 
     qf1_exp = FlattenMlp(
         hidden_sizes=[net_size, net_size, net_size],
@@ -71,12 +99,13 @@ def experiment(variant):
         action_dim=action_dim,
         latent_dim=latent_dim
      )
-    agent = ExpAgent(latent_dim,context_encoder,policy_exp,**variant['algo_params'])
+    agent_exp = ExpAgent(latent_dim,context_encoder,policy_exp,**variant['algo_params'])
     algorithm = ExpSAC(
         env=env,
         train_tasks=list(tasks[:variant['n_train_tasks']]),
         eval_tasks=list(tasks[-variant['n_eval_tasks']:]),
-        nets=[agent, qf1_exp, qf2_exp, vf_exp],
+        nets=[agent, qf1, qf2, vf],
+        nets_exp=[agent_exp, qf1_exp, qf2_exp, vf_exp],
         encoder=context_encoder,
         **variant['algo_params']
     )
