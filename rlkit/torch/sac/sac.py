@@ -576,7 +576,7 @@ class ExpSAC(ExpAlgorithm):
         qf_loss.backward()
         self.qf1_optimizer.step()
         self.qf2_optimizer.step()
-        self.context_optimizer.step()
+        #self.context_optimizer.step()
 
         # compute min Q on the new actions
         min_q_new_actions = self._min_q(obs, new_actions, task_z)
@@ -614,7 +614,7 @@ class ExpSAC(ExpAlgorithm):
         policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew_entropy = self.exploration_agent(obs, context)
         path_rew = ExpAlgorithm.sample_eval(self,indices,context)
         #path_rew = torch.sum(rewards_traj,keepdim=True,dim=1)
-        path_rew = torch.Tensor.repeat(path_rew,1,rewards_traj.shape[1],1)
+        path_rew = torch.Tensor.repeat(path_rew,1,rew_entropy.shape[1],1)
         rew_entropy = torch.unsqueeze(rew_entropy,2)
         #print(rew_entropy.shape,path_rew.shape)
         rew = rew_entropy*self.entropy_weight + path_rew
@@ -639,7 +639,7 @@ class ExpSAC(ExpAlgorithm):
         # encoder will only get gradients from Q nets
         q1_pred = self.qf1_exp(obs, actions, z_mean,z_var)
         q2_pred = self.qf2_exp(obs, actions, z_mean,z_var)
-        v_pred = self.vf_exp(obs, z_mean,z_var)
+        v_pred = self.vf_exp(obs, z_mean.detach(),z_var.detach())
         # get targets for use in V and Q updates
 
         with torch.no_grad():
@@ -661,7 +661,7 @@ class ExpSAC(ExpAlgorithm):
         qf_loss.backward()
         self.qf1_exp_optimizer.step()
         self.qf2_exp_optimizer.step()
-        # self.context_optimizer.step()
+        self.context_optimizer.step()
 
         # compute min Q on the new actions
         new_actions = new_actions.view(t * b, -1)

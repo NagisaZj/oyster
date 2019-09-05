@@ -340,20 +340,20 @@ class ExpAgent(nn.Module):
         ''' given context, get statistics under the current policy of a set of observations '''
         t, b, _ = obs.size()
         encoder_output_next = self.context_encoder.forward_seq(context)
-        z_mean_next = encoder_output_next[:,:,:self.latent_dim].detach()
-        z_var_next = F.softplus(encoder_output_next[:, :, self.latent_dim:]).detach()
+        z_mean_next = encoder_output_next[:,:,:self.latent_dim]
+        z_var_next = F.softplus(encoder_output_next[:, :, self.latent_dim:])
         var = ptu.ones(context.shape[0], 1,self.latent_dim)
         mean = ptu.ones(context.shape[0], 1,self.latent_dim)
-        z_mean = torch.cat([mean,z_mean_next],dim=1)[:,:-1,:].detach()
-        z_var = torch.cat([var,z_var_next],dim=1)[:,:-1,:].detach()
-        in_ = torch.cat([obs, z_mean,z_var], dim=2)
+        z_mean = torch.cat([mean,z_mean_next],dim=1)[:,:-1,:]
+        z_var = torch.cat([var,z_var_next],dim=1)[:,:-1,:]
+        in_ = torch.cat([obs, z_mean.detach(),z_var.detach()], dim=2)
         in_=in_.view(t * b, -1)
 
 
         policy_outputs = self.policy(in_, reparameterize=True, return_log_prob=True)
 
         rew = torch.mean(torch.log(z_var),dim=2) - torch.mean(torch.log(z_var_next),dim=2)
-
+        rew = rew.detach()
         return policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew
 
     def log_diagnostics(self, eval_statistics):

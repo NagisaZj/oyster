@@ -31,7 +31,7 @@
         "num_trajs_eval" : 5
     },
     "util_params": {
-        "base_log_dir":"outpute"
+        "base_log_dir":"outputet"
 
     }
 }
