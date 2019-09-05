@@ -14,6 +14,7 @@ from rlkit.smm.smm_policy import hard_smm_point
 from rlkit.smm.smm_sampler import SMMSampler
 from rlkit.policies.base import ExplorationPolicy
 import pickle
+import torch
 
 class MetaRLAlgorithm(metaclass=abc.ABCMeta):
     def __init__(
@@ -898,6 +899,22 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         """
         pass
 
+    def sample_eval(self,indices, context):
+        reward = torch.zeros(context.shape[0],1,1).cuda()
+        rem = 0
+        for indice in indices:
+            self.env.reset_task(indice)
+            context_i = context[rem,...]
+            context_i = torch.unsqueeze(context_i,0)
+            self.agent.clear_z()
+            self.agent.infer_posterior(context_i)
+            path,_ = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.max_path_length*5,resample=1)
+            reward[rem] = eval_util.get_average_returns(path)
+            rem = rem + 1
+        return reward
+
+
+
     def collect_data(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=False):
         '''
         get trajectories from current env in batch mode with given policy
@@ -1085,7 +1102,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
 
         while num_transitions < self.num_steps_per_eval:
 
-            path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.num_steps_per_eval - num_transitions, max_trajs=1, accum_context=False)
+            path, num = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.num_steps_per_eval - num_transitions, max_trajs=1, accum_context=True)
             paths += path
             num_transitions += num
             num_trajs += 1

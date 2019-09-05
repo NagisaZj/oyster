@@ -13,7 +13,7 @@
         "num_steps_prior": 100,
         "num_steps_posterior": 900,
         "num_extra_rl_steps_posterior": 0,
-        "num_train_steps_per_itr": 1000,
+        "num_train_steps_per_itr": 100,
         "num_steps_per_eval": 1000,
         "embedding_batch_size": 256,
         "embedding_mini_batch_size": 256,
@@ -27,8 +27,9 @@
         "seed_sample": 1,
         "snail": 1,
         "meta_episode_len": 5,
-        "num_trajs" : 5,
-        "num_trajs_eval" : 5
+        "num_trajs" : 3,
+        "num_trajs_eval" : 3,
+        "entropy_weight": 4e-2
     },
     "util_params": {
         "base_log_dir":"outpute"

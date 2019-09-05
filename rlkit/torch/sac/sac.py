@@ -612,8 +612,8 @@ class ExpSAC(ExpAlgorithm):
 
         obs, actions, rewards, next_obs, terms = context_unbatched
         policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew_entropy = self.exploration_agent(obs, context)
-
-        path_rew = torch.sum(rewards_traj,keepdim=True,dim=1)
+        path_rew = ExpAlgorithm.sample_eval(self,indices,context)
+        #path_rew = torch.sum(rewards_traj,keepdim=True,dim=1)
         path_rew = torch.Tensor.repeat(path_rew,1,rewards_traj.shape[1],1)
         rew_entropy = torch.unsqueeze(rew_entropy,2)
         #print(rew_entropy.shape,path_rew.shape)
