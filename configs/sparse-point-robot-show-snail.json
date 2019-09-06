@@ -23,7 +23,6 @@
         "kl_lambda": 1.0,
         "num_exp_traj_eval": 5,
         "dump_eval_paths":1,
-        "recurrent": 1,
         "snail": 1
     },
     "util_params": {
