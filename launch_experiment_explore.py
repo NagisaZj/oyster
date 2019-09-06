@@ -114,12 +114,12 @@ def experiment(variant):
     if variant['path_to_weights'] is not None:
         path = variant['path_to_weights']
         context_encoder.load_state_dict(torch.load(os.path.join(path, 'context_encoder.pth')))
-        #qf1.load_state_dict(torch.load(os.path.join(path, 'qf1.pth')))
-        #qf2.load_state_dict(torch.load(os.path.join(path, 'qf2.pth')))
-        #vf.load_state_dict(torch.load(os.path.join(path, 'vf.pth')))
+        qf1.load_state_dict(torch.load(os.path.join(path, 'qf1.pth')))
+        qf2.load_state_dict(torch.load(os.path.join(path, 'qf2.pth')))
+        vf.load_state_dict(torch.load(os.path.join(path, 'vf.pth')))
         # TODO hacky, revisit after model refactor
-        #algorithm.networks[-2].load_state_dict(torch.load(os.path.join(path, 'target_vf.pth')))
-        #policy.load_state_dict(torch.load(os.path.join(path, 'policy.pth')))
+        algorithm.networks[-6].load_state_dict(torch.load(os.path.join(path, 'target_vf.pth')))
+        policy.load_state_dict(torch.load(os.path.join(path, 'policy.pth')))
 
     # optional GPU mode
     ptu.set_gpu_mode(variant['util_params']['use_gpu'], variant['util_params']['gpu_id'])

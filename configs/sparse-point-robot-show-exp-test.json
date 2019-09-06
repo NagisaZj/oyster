@@ -2,6 +2,7 @@
     "env_name": "sparse-point-robot",
     "n_train_tasks": 2,
     "n_eval_tasks": 1,
+    "path_to_weights": "./outputa/sparse-point-robot/2019_09_01_09_51_24",
     "env_params": {
         "n_tasks": 3
     }

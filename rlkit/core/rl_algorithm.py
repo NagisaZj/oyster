@@ -969,7 +969,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
 
     def _try_to_eval(self, epoch):
         logger.save_extra_data(self.get_extra_data_to_save(epoch))
-        if self._can_evaluate():
+        if self._can_evaluate(epoch):
             self.evaluate(epoch,self.num_trajs)
 
             params = self.get_epoch_snapshot(epoch)
@@ -1015,7 +1015,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         else:
             logger.log("Skipping eval for now.")
 
-    def _can_evaluate(self):
+    def _can_evaluate(self,epoch):
         """
         One annoying thing about the logger table is that the keys at each
         iteration need to be the exact same. So unless you can compute
@@ -1028,7 +1028,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         :return:
         """
         # eval collects its own context, so can eval any time
-        return True
+        return True if (epoch+1)%5==0 else False
 
     def _can_train(self):
         return all([self.replay_buffer.num_steps_can_sample(idx) >= self.batch_size for idx in self.train_tasks])

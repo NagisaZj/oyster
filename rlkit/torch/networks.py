@@ -254,10 +254,10 @@ class SnailEncoder(FlattenMlp):
         # input should be (task, seq, feat) and hidden should be (1, task, feat)
 
         #self.lstm = nn.LSTM(self.hidden_dim, self.hidden_dim, num_layers=1, batch_first=True)
-        layer_count = 8
-        self.TC1 = TCBlock(self.hidden_dim,256,16)
+        layer_count = 7
+        self.TC1 = TCBlock(self.hidden_dim,128,16)
         self.atten1 = AttentionBlock(self.hidden_dim+16*layer_count,32,32)
-        self.TC2 = TCBlock(self.hidden_dim+16*layer_count+32,256,16)
+        self.TC2 = TCBlock(self.hidden_dim+16*layer_count+32,128,16)
         self.atten2 = AttentionBlock(self.hidden_dim+16*layer_count*2+32,32,32)
         self.out_layer = nn.Linear(self.hidden_dim+16*layer_count*2+32+32,self.output_size)
         self.var_start = int(self.output_size / 2)
