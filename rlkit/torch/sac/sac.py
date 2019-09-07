@@ -612,9 +612,8 @@ class ExpSAC(ExpAlgorithm):
 
         obs, actions, rewards, next_obs, terms = context_unbatched
         policy_outputs, z_mean,z_var,z_mean_next,z_var_next, rew_entropy = self.exploration_agent(obs, context)
-        path_rew = ExpAlgorithm.sample_eval(self,indices,context)
-        #path_rew = torch.sum(rewards_traj,keepdim=True,dim=1)
-        path_rew = torch.Tensor.repeat(path_rew,1,rew_entropy.shape[1],1)
+        path_rew = 0#ExpAlgorithm.sample_eval(self,indices,context)
+        path_rew = 0#torch.Tensor.repeat(path_rew,1,rew_entropy.shape[1],1)
         rew_entropy = torch.unsqueeze(rew_entropy,2)
         #print(rew_entropy.shape,path_rew.shape)
         rew = rew_entropy*self.entropy_weight + path_rew
@@ -631,8 +630,8 @@ class ExpSAC(ExpAlgorithm):
         actions = actions.view(t * b, -1)
         next_obs = next_obs.view(t * b, -1)
         #print(z_mean.shape, z_mean_next.shape, obs.shape, t, b)
-        z_mean = z_mean.view(t * b, -1)
-        z_var = z_var.view(t * b, -1)
+        z_mean = z_mean.view(t * b, -1).detach()
+        z_var = z_var.view(t * b, -1).detach()
         z_mean_next = z_mean_next.view(t * b, -1)
         z_var_next = z_var_next.view(t * b, -1)
         # Q and V networks

@@ -2,7 +2,7 @@
     "env_name": "sparse-point-robot",
     "n_train_tasks": 80,
     "n_eval_tasks": 20,
-    "path_to_weights": "./outputfin/sparse-point-robot/2019_09_06_10_14_10",
+    "path_to_weights": "./outputfin/sparse-point-robot/2019_09_06_10_33_07",
     "env_params": {
         "n_tasks": 100
     }
@@ -30,10 +30,10 @@
         "meta_episode_len": 4,
         "num_trajs" : 3,
         "num_trajs_eval" : 3,
-        "entropy_weight": 4e-2
+        "entropy_weight": 1
     },
     "util_params": {
-        "base_log_dir":"outpute"
+        "base_log_dir":"outputee"
 
     }
 }

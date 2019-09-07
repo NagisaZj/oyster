@@ -1028,7 +1028,7 @@ class ExpAlgorithm(metaclass=abc.ABCMeta):
         :return:
         """
         # eval collects its own context, so can eval any time
-        return True if (epoch+1)%5==0 else False
+        return True #if (epoch+1)%5==0 else False
 
     def _can_train(self):
         return all([self.replay_buffer.num_steps_can_sample(idx) >= self.batch_size for idx in self.train_tasks])
