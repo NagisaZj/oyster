@@ -508,7 +508,9 @@ class ExpAgentSimple(nn.Module):
 
         policy_outputs = self.policy(in_, reparameterize=True, return_log_prob=True)
 
-        rew = torch.mean(torch.log(z_var),dim=2) - torch.mean(torch.log(z_var_next),dim=2)
+        #rew = torch.mean(torch.log(z_var),dim=2) - torch.mean(torch.log(z_var_next),dim=2)
+        rew = torch.mean(torch.log(z_var[:,-1:,:]), dim=2) - torch.mean(torch.log(z_var_next[:,-1:,:]), dim=2)
+        rew = rew.repeat(1,z_var.shape[1],1)
         rew = rew.detach()
         return policy_outputs,rew#, z_mean,z_var,z_mean_next,z_var_next, rew
 
