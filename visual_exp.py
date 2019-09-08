@@ -6,25 +6,40 @@ import csv
 import pickle
 import os
 import colour
-
-
+import torch
+from rlkit.torch.networks import SnailEncoder,MlpEncoder
 # config
+def cal_rew(encoder,path):
+    s,a,r = path['observations'],path['actions'],path['rewards']
+    s,a,r=torch.FloatTensor(s),torch.FloatTensor(a),torch.FloatTensor(r)
+    input = torch.cat([s,a,r],dim=1)
+    print(input.shape)
+    input = torch.unsqueeze(input,0)
+    output = encoder.forward_seq(input)
+    print(output.shape)
+    var = torch.mean(torch.log(torch.nn.functional.softplus(output[:,:,10:])),dim=2)
+    var = torch.mean(torch.nn.functional.softplus(output[:,:,10:]),dim=2)
+    #var = torch.log(var)
+    print(var.shape)
+    #print(r,var)
+    return var.view(r.shape[0],r.shape[1])
 
 
-exp_id = '2019_08_15_14_07_30' #original
-#exp_id = '2019_08_15_14_32_06' #seed sampling
-
-
+exp_id = '2019_09_07_14_02_36' #gooooooood
+exp_id = '2019_09_07_14_02_39' #not good
+exp_id = '2019_09_08_09_02_27' #not good
+exp_id = '2019_09_08_09_28_38' #not good
+exp_id = '2019_09_06_10_35_38' #not good
 tlow, thigh = 80, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 400 # training epoch to load data from
+epoch = 100 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
 
-expdir = './outputt/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
-
+expdir = './outputee/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+expdir = './outputfin/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
 # helpers
 def load_pkl(task):
     with open(os.path.join(expdir, 'task{}-epoch{}-run0.pkl'.format(task, epoch)), 'rb') as f:
@@ -118,21 +133,35 @@ for j in range(3):
 fig.suptitle("iteration:%d, average reward of all tasks:%f"%(epoch,np.mean(reward)))
 
 
-task = 19
-fig, axes = plt.subplots(1, 1)
-axes.set_xlim([-1.25, 1.25])
-axes.set_ylim([-0.25, 1.25])
-for k, g in enumerate(goals):
-            alpha = 0.2 if k == task else 0.2
+task = 5
+fig, axes = plt.subplots(3, 3)
+encoder = SnailEncoder(hidden_sizes=[20],
+        input_size=5,
+        output_size=20,)
+#encoder.load_state_dict(torch.load(os.path.join(dir, 'context_encoder.pth')))
+ap = [t for t in load_pkl(task+80)]
+
+
+for m in range(3):
+    for n in range(3):
+        id = m*3 +n
+        axes[m,n].set_xlim([-1.25, 1.25])
+        axes[m,n].set_ylim([-0.25, 1.25])
+        for k, g in enumerate(goals):
+            alpha = 1 if k == task else 0.2
             circle = plt.Circle((g[0], g[1]), radius=gr, alpha=alpha)
-            axes.add_artist(circle)
-states = all_paths[task][0]
-axes.plot(states[:-1, 0], states[:-1, 1], '-', color=colors[0])
-axes.plot(states[-1, 0], states[-1, 1], '-x', markersize=10, color=colors[0])
-for i in range(0,9):
-    axes.text(states[i,0],states[i,1],'%i'%i)
-for i in range(10,50,5):
-    axes.text(states[i,0]+np.random.rand()*0.0-0.0,states[i,1]+np.random.rand()*0.0-0.0,'%i'%i)
-
-
+            axes[m,n].add_artist(circle)
+        states = all_paths[task][id]
+        rew = cal_rew(encoder, ap[id])
+        axes[m,n].plot(states[:-1, 0], states[:-1, 1], '-', color=colors[0])
+        axes[m,n].plot(states[-1, 0], states[-1, 1], '-x', markersize=10, color=colors[0])
+        for i in range(0, 9, 9):
+            #axes[m, n].text(states[i, 0], states[i, 1], '%f' % rew[i, 0].data.numpy())
+            axes[m, n].text(states[i, 0], states[i, 1], '%f' % np.mean(ap[id]['z_vars'][i]))
+        for i in range(31, 32, 10):
+            #axes[m, n].text(states[i, 0] + np.random.rand() * 0.0 - 0.0, states[i, 1] + np.random.rand() * 0.0 - 0.0,
+            #                '%f' % rew[i, 0].data.numpy())
+            axes[m, n].text(states[i, 0], states[i, 1], '%f' % np.mean(ap[id]['z_vars'][i]))
+for i in range(30):
+    print(ap[i]['z_means'])
 plt.show()
