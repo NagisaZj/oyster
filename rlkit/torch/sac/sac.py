@@ -744,7 +744,12 @@ class ExpSAC(ExpAlgorithm):
             policy=self.agent.state_dict(),
             vf=self.vf.state_dict(),
             target_vf=self.target_vf.state_dict(),
-            #context_encoder=self.agent.context_encoder.state_dict(),
+            context_encoder=self.agent.context_encoder.state_dict(),
+            qf1_exp=self.qf1_exp.state_dict(),
+            qf2_exp=self.qf2_exp.state_dict(),
+            policy_exp=self.exploration_agent.state_dict(),
+            vf_exp=self.vf_exp.state_dict(),
+            target_vf_exp=self.target_exp_vf.state_dict(),
         )
         return snapshot
 
@@ -1157,7 +1162,12 @@ class ExpSACSimple(ExpAlgorithmSimple):
             policy=self.agent.state_dict(),
             vf=self.vf.state_dict(),
             target_vf=self.target_vf.state_dict(),
-            #context_encoder=self.agent.context_encoder.state_dict(),
+            context_encoder=self.agent.context_encoder.state_dict(),
+            qf1_exp=self.qf1_exp.state_dict(),
+            qf2_exp=self.qf2_exp.state_dict(),
+            policy_exp=self.exploration_agent.state_dict(),
+            vf_exp=self.vf_exp.state_dict(),
+            target_vf_exp=self.target_exp_vf.state_dict(),
         )
         return snapshot
 

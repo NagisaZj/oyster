@@ -1355,7 +1355,11 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
             max_path_length=self.max_path_length,
         )
 
-
+        self.seedsampler = SeedInPlacePathSampler(
+            env=env,
+            policy=agent,
+            max_path_length=self.max_path_length,
+        )
         # separate replay buffers for
         # - training RL update
         # - training encoder update
@@ -1423,7 +1427,10 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
                     self.env.reset_task(idx)
                     for _ in range(self.num_trajs):
                         self.collect_data_exp(self.meta_episode_len)
-                    self.collect_data(self.num_initial_steps, 1, np.inf,add_to_enc_buffer=True)
+                    if self.seed_sample:
+                        self.collect_data_seed(self.num_initial_steps, 1, np.inf, add_to_enc_buffer=True)
+                    else:
+                        self.collect_data(self.num_initial_steps, 1, np.inf,add_to_enc_buffer=True)
             # Sample data from train tasks.
             for i in range(self.num_tasks_sample):
                 idx = np.random.randint(len(self.train_tasks))
@@ -1434,13 +1441,22 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
                 for _ in range(self.num_trajs):
                     self.collect_data_exp(self.meta_episode_len)
                 if self.num_steps_prior > 0:
-                    self.collect_data(self.num_steps_prior, 1, np.inf,add_to_enc_buffer=True)
+                    if self.seed_sample:
+                        self.collect_data_seed(self.num_steps_prior, 1, np.inf, add_to_enc_buffer=True)
+                    else:
+                        self.collect_data(self.num_steps_prior, 1, np.inf,add_to_enc_buffer=True)
                     # collect some trajectories with z ~ posterior
                 if self.num_steps_posterior > 0:
-                    self.collect_data(self.num_steps_posterior, 1, self.update_post_train,add_to_enc_buffer=True)
+                    if self.seed_sample:
+                        self.collect_data_seed(self.num_steps_posterior, 1, self.update_post_train, add_to_enc_buffer=True)
+                    else:
+                        self.collect_data(self.num_steps_posterior, 1, self.update_post_train,add_to_enc_buffer=True)
                     # even if encoder is trained only on samples from the prior, the policy needs to learn to handle z ~ posterior
                 if self.num_extra_rl_steps_posterior > 0:
-                    self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,)
+                    if self.seed_sample:
+                        self.collect_data_seed(self.num_extra_rl_steps_posterior, 1, self.update_post_train,)
+                    else:
+                        self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train,)
             print('collect over')
 
             # Sample train tasks and compute gradient updates on parameters.
@@ -1531,7 +1547,24 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
         self._n_env_steps_total += n_samples
         gt.stamp('sample')
 
-
+    def collect_data_seed(self, num_samples, resample_z_rate, update_posterior_rate, add_to_enc_buffer=True,add_to_policy_buffer=True,accumulate_context=True):
+        self.agent.clear_z()
+        num_transitions = 0
+        while num_transitions < num_samples:
+            paths, n_samples = self.seedsampler.obtain_samples(max_samples=num_samples - num_transitions,
+                                                                max_trajs=1,
+                                                                accum_context=accumulate_context
+                                                                )
+            num_transitions += n_samples
+            if add_to_policy_buffer:
+                self.replay_buffer.add_paths(self.task_idx, paths)
+            if add_to_enc_buffer:
+                self.enc_replay_buffer.add_paths(self.task_idx, paths)
+            #if update_posterior_rate != np.inf:
+            #    context = self.prepare_context(self.task_idx)
+            #    self.agent.infer_posterior(context)
+        self._n_env_steps_total += num_transitions
+        gt.stamp('sample')
     def _try_to_eval(self, epoch):
         logger.save_extra_data(self.get_extra_data_to_save(epoch))
         if self._can_evaluate(epoch):
