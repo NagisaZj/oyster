@@ -480,8 +480,8 @@ def exprolloutsimple(env, agent, max_path_length,  max_trajs, accum_context_for_
             actions.append(a)
             agent_infos.append(agent_info)
             env_infos.append(env_info)
-            # z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
-            # z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+            z_means.append(agent.z_means.cpu().data.numpy())
+            z_vars.append(agent.z_vars.cpu().data.numpy())
             path_length += 1
             if d:
                 break
@@ -568,8 +568,8 @@ def exprollout_splitsimple(env, agent, max_path_length,  max_trajs, accum_contex
             actions.append(a)
             agent_infos.append(agent_info)
             env_infos.append(env_info)
-            # z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
-            # z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+            z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
+            z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
             path_length += 1
             if d:
                 break
@@ -601,8 +601,9 @@ def exprollout_splitsimple(env, agent, max_path_length,  max_trajs, accum_contex
             z_means=z_means,
             z_vars=z_vars
         ))
+        #print(len(paths))
 
-        return paths
+    return paths
 
 def split_paths(paths):
     """

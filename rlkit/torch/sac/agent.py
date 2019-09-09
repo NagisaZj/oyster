@@ -513,10 +513,10 @@ class ExpAgentSimple(nn.Module):
 
         policy_outputs = self.policy(in_, reparameterize=True, return_log_prob=True)
 
-        #rew = torch.min(torch.log(z_var),dim=2,keepdim=True)[0] - torch.min(torch.log(z_var_next),dim=2,keepdim=True)[0]
+        rew = torch.min(torch.log(z_var),dim=2,keepdim=True)[0] - torch.min(torch.log(z_var_next),dim=2,keepdim=True)[0]
         #print(rew.shape)
-        rew = torch.min(torch.log(z_var[:,0:1,:]), dim=2,keepdim=True)[0] - torch.min(torch.log(z_var_next[:,-1:,:]), dim=2,keepdim=True)[0]
-        rew = rew.repeat(1,z_var.shape[1],1)
+        #rew = torch.min(torch.log(z_var[:,0:1,:]), dim=2,keepdim=True)[0] - torch.min(torch.log(z_var_next[:,-1:,:]), dim=2,keepdim=True)[0]
+        #rew = rew.repeat(1,z_var.shape[1],1)
         rew = rew.detach()
         return policy_outputs,rew#, z_mean,z_var,z_mean_next,z_var_next, rew
 
