@@ -29,17 +29,19 @@ exp_id = '2019_09_07_14_02_36' #gooooooood
 exp_id = '2019_09_07_14_02_39' #not good
 exp_id = '2019_09_08_09_02_27' #not good
 exp_id = '2019_09_08_09_28_38' #not good
-exp_id = '2019_09_06_10_35_38' #not good
+exp_id = '2019_09_08_15_00_41' #not good
+exp_id = '2019_09_08_20_08_03' #not good
 tlow, thigh = 80, 100 # task ID range
 # see `n_tasks` and `n_eval_tasks` args in the training config json
 # by convention, the test tasks are always the last `n_eval_tasks` IDs
 # so if there are 100 tasks total, and 20 test tasks, the test tasks will be IDs 81-100
-epoch = 100 # training epoch to load data from
+epoch = 237 # training epoch to load data from
 gr = 0.2 # goal radius, for visualization purposes
 
 
 expdir = './outputee/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
 expdir = './outputfin/sparse-point-robot/{}/eval_trajectories/'.format(exp_id)
+dir = './outputfin/sparse-point-robot/{}/'.format(exp_id)
 # helpers
 def load_pkl(task):
     with open(os.path.join(expdir, 'task{}-epoch{}-run0.pkl'.format(task, epoch)), 'rb') as f:
@@ -133,18 +135,18 @@ for j in range(3):
 fig.suptitle("iteration:%d, average reward of all tasks:%f"%(epoch,np.mean(reward)))
 
 
-task = 5
-fig, axes = plt.subplots(3, 3)
+task = 2
+fig, axes = plt.subplots(4, 4)
 encoder = SnailEncoder(hidden_sizes=[20],
         input_size=5,
-        output_size=20,)
+        output_size=10,)
 #encoder.load_state_dict(torch.load(os.path.join(dir, 'context_encoder.pth')))
 ap = [t for t in load_pkl(task+80)]
 
 
-for m in range(3):
-    for n in range(3):
-        id = m*3 +n
+for m in range(4):
+    for n in range(4):
+        id = m*4 +n
         axes[m,n].set_xlim([-1.25, 1.25])
         axes[m,n].set_ylim([-0.25, 1.25])
         for k, g in enumerate(goals):
@@ -152,16 +154,16 @@ for m in range(3):
             circle = plt.Circle((g[0], g[1]), radius=gr, alpha=alpha)
             axes[m,n].add_artist(circle)
         states = all_paths[task][id]
-        rew = cal_rew(encoder, ap[id])
+        #rew = cal_rew(encoder, ap[id])
         axes[m,n].plot(states[:-1, 0], states[:-1, 1], '-', color=colors[0])
         axes[m,n].plot(states[-1, 0], states[-1, 1], '-x', markersize=10, color=colors[0])
         for i in range(0, 9, 9):
             #axes[m, n].text(states[i, 0], states[i, 1], '%f' % rew[i, 0].data.numpy())
             axes[m, n].text(states[i, 0], states[i, 1], '%f' % np.mean(ap[id]['z_vars'][i]))
-        for i in range(31, 32, 10):
+        for i in range(19, 20, 10):
             #axes[m, n].text(states[i, 0] + np.random.rand() * 0.0 - 0.0, states[i, 1] + np.random.rand() * 0.0 - 0.0,
             #                '%f' % rew[i, 0].data.numpy())
-            axes[m, n].text(states[i, 0], states[i, 1], '%f' % np.mean(ap[id]['z_vars'][i]))
-for i in range(30):
+            axes[m, n].text(states[i, 0], states[i, 1], '%f' % np.min(ap[id]['z_vars'][i]))
+for i in range(10):
     print(ap[i]['z_means'])
 plt.show()

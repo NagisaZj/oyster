@@ -50,8 +50,8 @@ def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=F
         actions.append(a)
         agent_infos.append(agent_info)
         env_infos.append(env_info)
-        z_means.append(np.mean(agent.z_means.cpu().data.numpy()))
-        z_vars.append(np.mean(agent.z_vars.cpu().data.numpy()))
+        z_means.append(agent.z_means.cpu().data.numpy())
+        z_vars.append(agent.z_vars.cpu().data.numpy())
         path_length += 1
         if d:
             break

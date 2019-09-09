@@ -25,7 +25,7 @@
         "dump_eval_paths":1
     },
     "util_params": {
-        "base_log_dir":"outputa"
+        "base_log_dir":"outputfin"
 
     }
 }
