@@ -136,6 +136,7 @@ class ExpInPlacePathSamplerSimple(object):
         paths = []
         n_steps_total = 0
         n_trajs = 0
+        policy.reset_RNN()
         if not split:
             path = exprolloutsimple(
             self.env, policy, max_path_length=self.max_path_length, max_trajs=max_trajs, accum_context_for_agent=accum_context_for_agent, context_agent = context_agent)

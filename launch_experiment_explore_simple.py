@@ -11,7 +11,7 @@ import torch
 
 from rlkit.envs import ENVS
 from rlkit.envs.wrappers import NormalizedBoxEnv
-from rlkit.torch.sac.policies import TanhGaussianPolicy, PEARLTanhGaussianPolicy
+from rlkit.torch.sac.policies import TanhGaussianPolicy, PEARLTanhGaussianPolicy, PEARLRecurrentPolicy
 from rlkit.torch.networks import FlattenMlp, MlpEncoder, RecurrentEncoder, SnailEncoder
 from rlkit.torch.sac.sac import PEARLSoftActorCritic, ExpSAC,ExpSACSimple
 from rlkit.torch.sac.agent import PEARLAgent, ExpAgent, ExpAgentSimple
@@ -93,7 +93,7 @@ def experiment(variant):
         input_size=obs_dim ,
         output_size=1,
     )
-    policy_exp = PEARLTanhGaussianPolicy(
+    policy_exp = PEARLRecurrentPolicy(
         hidden_sizes=[net_size, net_size, net_size],
         obs_dim=obs_dim ,
         action_dim=action_dim,

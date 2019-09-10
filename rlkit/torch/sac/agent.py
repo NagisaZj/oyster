@@ -495,32 +495,19 @@ class ExpAgentSimple(nn.Module):
     def forward(self, obs, context=None):
         ''' given context, get statistics under the current policy of a set of observations '''
         t, b, _ = obs.size()
-        if isinstance(self.context_encoder,SnailEncoder):
-            encoder_output_next = self.context_encoder.forward_seq(context)
-        else:
-            encoder_output_next= self.context_encoder(context)
-            encoder_output_next = encoder_output_next.view(context.size(0),-1,self.context_encoder.output_size)
-            #print(encoder_output_next.shape)
-        #z_mean_next = encoder_output_next[:,:,:self.latent_dim]
-        z_var_next = F.softplus(encoder_output_next[:, :, self.latent_dim:])
-        var = ptu.ones(context.shape[0], 1,self.latent_dim)
-        #mean = ptu.ones(context.shape[0], 1,self.latent_dim)
-        #z_mean = torch.cat([mean,z_mean_next],dim=1)[:,:-1,:]
-        z_var = torch.cat([var,z_var_next],dim=1)[:,:-1,:]
-        in_ = obs#torch.cat([obs, z_mean.detach(),z_var.detach()], dim=2)
-        in_=in_.view(t * b, -1)
+
+        in_ = obs
+        #in_=in_.view(t * b, -1)
 
 
         policy_outputs = self.policy(in_, reparameterize=True, return_log_prob=True)
 
-        rew = torch.min(torch.log(z_var),dim=2,keepdim=True)[0] - torch.min(torch.log(z_var_next),dim=2,keepdim=True)[0]
-        #print(rew.shape)
-        #rew = torch.min(torch.log(z_var[:,0:1,:]), dim=2,keepdim=True)[0] - torch.min(torch.log(z_var_next[:,-1:,:]), dim=2,keepdim=True)[0]
-        #rew = rew.repeat(1,z_var.shape[1],1)
-        rew = rew.detach()
-        return policy_outputs,rew#, z_mean,z_var,z_mean_next,z_var_next, rew
 
 
+        return policy_outputs#, z_mean,z_var,z_mean_next,z_var_next, rew
+
+    def reset_RNN(self,num_tasks=1):
+        self.policy.reset_RNN(num_tasks)
 
     def log_diagnostics(self, eval_statistics):
         '''

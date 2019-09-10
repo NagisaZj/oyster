@@ -1047,7 +1047,8 @@ class ExpSACSimple(ExpAlgorithmSimple):
         self.policy_optimizer.step()
 
         obs, actions, rewards, next_obs, terms, er = context_unbatched
-        policy_outputs, _ = self.exploration_agent(obs, context)
+        self.exploration_agent.reset_RNN(num_tasks=obs.shape[0])
+        policy_outputs = self.exploration_agent(obs, context)
         rew = er
         new_actions, policy_mean, policy_log_std, log_pi = policy_outputs[:4]
 

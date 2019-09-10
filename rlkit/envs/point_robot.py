@@ -111,6 +111,7 @@ class SparsePointEnv(PointEnv):
 
     def reset_model(self):
         self._state = np.array([0, 0])
+        self.mask2 = np.ones((80,),dtype=np.float32)
         return self._get_obs()
 
     def step(self, action):
@@ -119,19 +120,19 @@ class SparsePointEnv(PointEnv):
         # make sparse rewards positive
         if reward >= -self.goal_radius:
             sparse_reward += 1
-        explore_reward = self.get_explore_reward(self._state,sparse_reward,action)
+        explore_reward = self.get_explore_reward(self._state,action)
         d.update({'sparse_reward': sparse_reward,"info":explore_reward})
         return ob, reward, done, d
 
-    def get_explore_reward(self,_state,sparse_reward,action):
+    def get_explore_reward(self,_state,action):
         relative_pos = self.goals_np - _state
         rew = -1 * (relative_pos[:,0] **2 + relative_pos[:,1] **2 ) **0.5
         mask = (rew >= -self.goal_radius).astype(np.float32)
         rew = rew * mask
-        explore_reward = np.mean(np.abs(rew-sparse_reward))
-        if np.sum(action)<0.1:
-            explore_reward = 0
-        #print(rew)
+        rew = rew * self.mask2
+        self.mask2 = self.mask2 * (1 - mask * 0.5)
+        explore_reward = np.var(rew) * 100
+        #print(explore_reward)
         return explore_reward
 
 
