@@ -1442,9 +1442,9 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
                     self.collect_data_exp(self.meta_episode_len)
                 if self.num_steps_prior > 0:
                     if self.seed_sample:
-                        self.collect_data_seed(self.num_steps_prior, 1, np.inf, add_to_enc_buffer=True)
+                        self.collect_data_seed(self.num_steps_prior, 1, np.inf, add_to_enc_buffer=False)
                     else:
-                        self.collect_data(self.num_steps_prior, 1, np.inf,add_to_enc_buffer=True)
+                        self.collect_data(self.num_steps_prior, 1, np.inf,add_to_enc_buffer=False)
                     # collect some trajectories with z ~ posterior
                 if self.num_steps_posterior > 0:
                     if self.seed_sample:
