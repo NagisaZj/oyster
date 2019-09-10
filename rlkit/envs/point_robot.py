@@ -101,6 +101,7 @@ class SparsePointEnv(PointEnv):
 
         self.goals = goals
         self.reset_task(0)
+        self.goals_np = np.array(goals)[:80,:]
 
     def sparsify_rewards(self, r):
         ''' zero out rewards when outside the goal radius '''
@@ -118,8 +119,21 @@ class SparsePointEnv(PointEnv):
         # make sparse rewards positive
         if reward >= -self.goal_radius:
             sparse_reward += 1
-        d.update({'sparse_reward': sparse_reward})
+        explore_reward = self.get_explore_reward(self._state,sparse_reward)
+        d.update({'sparse_reward': sparse_reward,"info":explore_reward})
         return ob, reward, done, d
+
+    def get_explore_reward(self,_state,sparse_reward):
+        relative_pos = self.goals_np - _state
+        rew = -1 * (relative_pos[:,0] **2 + relative_pos[:,1] **2 ) **0.5
+        mask = (rew >= -self.goal_radius).astype(np.float32)
+        rew = rew * mask
+        explore_reward = np.mean(np.abs(rew-sparse_reward))
+        #print(rew)
+        return explore_reward
+
+
+
 
 
 @register_env('goal-pitfall')
