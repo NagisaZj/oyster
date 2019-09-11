@@ -128,9 +128,9 @@ class SparsePointEnv(PointEnv):
         relative_pos = self.goals_np - _state
         rew = -1 * (relative_pos[:,0] **2 + relative_pos[:,1] **2 ) **0.5
         mask = (rew >= -self.goal_radius).astype(np.float32)
-        rew = rew * mask
+        rew = rew * mask + mask
         rew = rew * self.mask2
-        self.mask2 = self.mask2 * (1 - mask * 0.5)
+        self.mask2 = self.mask2 * (1 - rew * 0.5)
         explore_reward = np.var(rew) * 100
         #print(explore_reward)
         return explore_reward

@@ -1692,7 +1692,7 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
         num_transitions = 0
         num_trajs = 0
 
-        path, num = self.expsampler.obtain_samples(deterministic=self.eval_deterministic,
+        path, num = self.expsampler.obtain_samples(deterministic=False,
                                                    max_trajs=self.num_exp_traj_eval, accum_context_for_agent=True, context_agent = self.agent,split=True)
         num_transitions += num
         num_trajs +=self.num_exp_traj_eval
