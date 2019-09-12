@@ -102,6 +102,7 @@ class SparsePointEnv(PointEnv):
         self.goals = goals
         self.reset_task(0)
         self.goals_np = np.array(goals)[:80,:]
+        self.mask2 = np.ones((80,), dtype=np.float32)
 
     def sparsify_rewards(self, r):
         ''' zero out rewards when outside the goal radius '''
