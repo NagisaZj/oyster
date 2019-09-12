@@ -1270,7 +1270,7 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
             reward_scale=1,
             num_exp_traj_eval=1,
             update_post_train=1,
-            eval_deterministic=True,
+            eval_deterministic=False,
             render=False,
             save_replay_buffer=False,
             save_algorithm=False,
@@ -1692,7 +1692,7 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
         num_transitions = 0
         num_trajs = 0
 
-        path, num = self.expsampler.obtain_samples(deterministic=False,
+        path, num = self.expsampler.obtain_samples(deterministic=self.eval_deterministic,
                                                    max_trajs=self.num_exp_traj_eval, accum_context_for_agent=True, context_agent = self.agent,split=True)
         num_transitions += num
         num_trajs +=self.num_exp_traj_eval

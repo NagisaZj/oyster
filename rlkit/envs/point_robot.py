@@ -111,8 +111,11 @@ class SparsePointEnv(PointEnv):
 
     def reset_model(self):
         self._state = np.array([0, 0])
-        self.mask2 = np.ones((80,),dtype=np.float32)
+        #self.mask2 = np.ones((80,),dtype=np.float32)
         return self._get_obs()
+
+    def reset_mask(self):
+        self.mask2= np.ones((80,),dtype=np.float32)
 
     def step(self, action):
         ob, reward, done, d = super().step(action)

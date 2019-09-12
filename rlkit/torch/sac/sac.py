@@ -908,12 +908,12 @@ class ExpSACSimple(ExpAlgorithmSimple):
         unpacked = [torch.cat(x, dim=0) for x in unpacked]
         return unpacked
 
-    def sample_context(self, indices):
+    def sample_context(self, indices,sequence):
         ''' sample batch of context from a list of tasks from the replay buffer '''
         # make method work given a single task index
         if not hasattr(indices, '__iter__'):
             indices = [indices]
-        batches = [ptu.np_to_pytorch_batch(self.enc_replay_buffer.random_batch(idx, batch_size=self.embedding_batch_size, sequence=self.recurrent)) for idx in indices]
+        batches = [ptu.np_to_pytorch_batch(self.enc_replay_buffer.random_batch(idx, batch_size=self.embedding_batch_size, sequence=sequence)) for idx in indices]
         context = [self.unpack_batch_context(batch, sparse_reward=self.sparse_rewards) for batch in batches]
         # group like elements together
         context = [[x[i] for x in context] for i in range(len(context[0]))]
@@ -934,7 +934,8 @@ class ExpSACSimple(ExpAlgorithmSimple):
         num_updates = self.embedding_batch_size // mb_size
 
         # sample context batch
-        context_batch,context_unbatched = self.sample_context(indices)
+        context_batch,context_unbatched = self.sample_context(indices,False)
+        _,context_unbatched = self.sample_context(indices,True)
 
         # zero out context and hidden encoder state
         self.agent.clear_z(num_tasks=len(indices))
