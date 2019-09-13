@@ -16,7 +16,7 @@
         "num_steps_per_eval": 1000,
         "embedding_batch_size": 1024,
         "embedding_mini_batch_size": 1024,
-        "max_path_length": 50,
+        "max_path_length": 32,
         "discount": 0.90,
         "reward_scale": 100.0,
         "sparse_rewards": 1,
@@ -24,5 +24,9 @@
         "num_exp_traj_eval": 5,
         "dump_eval_paths":1,
         "seed_sample": 1
+    },
+    "util_params": {
+        "base_log_dir":"outputseed"
+
     }
 }

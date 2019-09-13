@@ -1520,7 +1520,7 @@ class ExpAlgorithmSimple(metaclass=abc.ABCMeta):
             if add_to_enc_buffer:
                 self.enc_replay_buffer.add_paths(self.task_idx, paths)
             if update_posterior_rate != np.inf:
-                context, context_unbatched = self.sample_context(self.task_idx)
+                context, context_unbatched = self.sample_context(self.task_idx,False)
                 self.agent.infer_posterior(context)
         self._n_env_steps_total += num_transitions
         gt.stamp('sample')

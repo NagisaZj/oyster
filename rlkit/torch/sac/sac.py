@@ -908,7 +908,7 @@ class ExpSACSimple(ExpAlgorithmSimple):
         unpacked = [torch.cat(x, dim=0) for x in unpacked]
         return unpacked
 
-    def sample_context(self, indices,sequence):
+    def sample_context(self, indices,sequence=False):
         ''' sample batch of context from a list of tasks from the replay buffer '''
         # make method work given a single task index
         if not hasattr(indices, '__iter__'):
