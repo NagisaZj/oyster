@@ -1594,43 +1594,6 @@ class ExpSACIter(ExpAlgorithmIter):
         self.policy_exp_optimizer.step()
 
         # save some statistics for eval
-        if self.eval_statistics is None:
-            # eval should set this to None.
-            # this way, these statistics are only computed for one batch.
-            self.eval_statistics = OrderedDict()
-            if self.use_information_bottleneck:
-                z_mean = np.mean(np.abs(ptu.get_numpy(self.agent.z_means[0])))
-                z_sig = np.mean(ptu.get_numpy(self.agent.z_vars[0]))
-                self.eval_statistics['Z mean train'] = z_mean
-                self.eval_statistics['Z variance train'] = z_sig
-                self.eval_statistics['KL Divergence'] = ptu.get_numpy(kl_div)
-                self.eval_statistics['KL Loss'] = ptu.get_numpy(kl_loss)
-
-            self.eval_statistics['QF Loss'] = np.mean(ptu.get_numpy(qf_loss))
-            self.eval_statistics['VF Loss'] = np.mean(ptu.get_numpy(vf_loss))
-            self.eval_statistics['Policy Loss'] = np.mean(ptu.get_numpy(
-                policy_loss
-            ))
-            self.eval_statistics.update(create_stats_ordered_dict(
-                'Q Predictions',
-                ptu.get_numpy(q1_pred),
-            ))
-            self.eval_statistics.update(create_stats_ordered_dict(
-                'V Predictions',
-                ptu.get_numpy(v_pred),
-            ))
-            self.eval_statistics.update(create_stats_ordered_dict(
-                'Log Pis',
-                ptu.get_numpy(log_pi),
-            ))
-            self.eval_statistics.update(create_stats_ordered_dict(
-                'Policy mu',
-                ptu.get_numpy(policy_mean),
-            ))
-            self.eval_statistics.update(create_stats_ordered_dict(
-                'Policy log std',
-                ptu.get_numpy(policy_log_std),
-            ))
 
     def get_epoch_snapshot(self, epoch):
         # NOTE: overriding parent method which also optionally saves the env
