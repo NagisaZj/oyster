@@ -124,8 +124,9 @@ class SparsePointEnv(PointEnv):
         # make sparse rewards positive
         if reward >= -self.goal_radius:
             sparse_reward += 1
-        explore_reward = self.get_explore_reward(self._state,action)
-        d.update({'sparse_reward': sparse_reward,"info":explore_reward})
+        #explore_reward = self.get_explore_reward(self._state,action)
+        #d.update({'sparse_reward': sparse_reward,"info":explore_reward})
+        d.update({'sparse_reward': sparse_reward})
         return ob, reward, done, d
 
     def get_explore_reward(self,_state,action):
