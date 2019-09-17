@@ -107,7 +107,8 @@ default_config_exp = dict(
         num_trajs = 5,
         num_trajs_eval = 5,
         use_info_in_context=False,
-        entropy_weight=1e-2
+        entropy_weight=1e-2,
+        sample_interval=5
     ),
     util_params=dict(
         base_log_dir='output1',

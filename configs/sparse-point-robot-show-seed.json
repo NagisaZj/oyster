@@ -23,10 +23,12 @@
         "kl_lambda": 1.0,
         "num_exp_traj_eval": 5,
         "dump_eval_paths":1,
-        "seed_sample": 1
+        "seed_sample": 1,
+        "snail": 0,
+        "sample_interval": 5
     },
     "util_params": {
-        "base_log_dir":"outputseed"
+        "base_log_dir":"outputseed_5"
 
     }
 }

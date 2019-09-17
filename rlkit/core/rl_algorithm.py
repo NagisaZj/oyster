@@ -57,7 +57,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             num_skills = 1,
             seed_sample=False,
             attention=False,
-            snail=False
+            snail=False,
+            sample_interval=5
     ):
         """
         :param env: training env
@@ -119,6 +120,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             env=env,
             policy=agent,
             max_path_length=self.max_path_length,
+                sample_interval=sample_interval
         )
 
         if self.use_SMM:

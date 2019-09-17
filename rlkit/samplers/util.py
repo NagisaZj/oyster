@@ -84,7 +84,7 @@ def rollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=F
         z_vars=z_vars
     )
 
-def seedrollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False,random_seed=None):
+def seedrollout(env, agent, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False,random_seed=None,sample_interval=5):
     """
     The following value for the following keys will be a 2D array, with the
     first dimension corresponding to the time dimension.
@@ -123,8 +123,9 @@ def seedrollout(env, agent, max_path_length=np.inf, accum_context=True, resample
         if agent.context is None:
             agent.z = ptu.FloatTensor(random_seed)
         else:
-            agent.infer_posterior(agent.context)
-            agent.z = agent.z_means + torch.sqrt(agent.z_vars)*ptu.FloatTensor(random_seed)
+            if path_length % sample_interval ==0:
+                agent.infer_posterior(agent.context)
+                agent.z = agent.z_means + torch.sqrt(agent.z_vars)*ptu.FloatTensor(random_seed)
         a, agent_info = agent.get_action(o)
         next_o, r, d, env_info = env.step(a)
         # update the agent's current context

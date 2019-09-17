@@ -166,13 +166,13 @@ class SeedInPlacePathSampler(object):
     sampler.obtain_samples  # this has side-effects: env will change!
     ```
     """
-    def __init__(self, env, policy, max_path_length):
+    def __init__(self, env, policy, max_path_length,sample_interval=5):
         self.env = env
         self.policy = policy
 
         self.max_path_length = max_path_length
         self.latent_dim = policy.latent_dim
-
+        self.sample_interval = sample_interval
     def start_worker(self):
         pass
 
@@ -193,7 +193,7 @@ class SeedInPlacePathSampler(object):
         while n_steps_total < max_samples and n_trajs < max_trajs:
             self.random_seed = np.random.randn(1,self.latent_dim)
             path = seedrollout(
-                self.env, policy, max_path_length=self.max_path_length, accum_context=accum_context,random_seed=self.random_seed)
+                self.env, policy, max_path_length=self.max_path_length, accum_context=accum_context,random_seed=self.random_seed,sample_interval=self.sample_interval)
             # save the latent context that generated this trajectory
             path['context'] = policy.z.detach().cpu().numpy()
             paths.append(path)
