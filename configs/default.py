@@ -49,7 +49,8 @@ default_config = dict(
         seed_sample = False,
         attention = False,
         snail=False,
-        use_info_in_context=False
+        use_info_in_context=False,
+        sample_interval=5
     ),
     util_params=dict(
         base_log_dir='output1',
